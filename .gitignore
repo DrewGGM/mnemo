@@ -1,0 +1,51 @@
+# Go
+/bin/
+/dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+coverage.*
+*.coverprofile
+go.work
+go.work.sum
+vendor/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Python evaluation harness (uv)
+eval/.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Benchmark data is downloaded at run time and never committed
+# (LoCoMo is CC BY-NC 4.0; LongMemEval is fetched from its own host)
+eval/data/
+
+# Raw run artefacts: traces, model responses, extraction cache.
+# Only the summarized results under eval/results/ are committed.
+eval/runs/
+eval/cache/
+
+# Local PostgreSQL volumes and dumps
+/pgdata/
+*.dump
+*.sql.gz
+
+# Editors and OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db

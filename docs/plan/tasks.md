@@ -31,7 +31,7 @@ Las listas "Tocar solo", dependencias y criterios de este archivo ya incorporan 
 - [x] T-001 Módulo Go, binario `mnemo serve` y `/healthz`
 - [x] T-002 PostgreSQL en Docker, migraciones y `/readyz`
 - [x] T-003 Imagen, CI y comprobadores de arquitectura y dependencias
-- [ ] T-004 Guardar y recuperar episodios de punta a punta (solo vector)
+- [x] T-004 Guardar y recuperar episodios de punta a punta (solo vector)
 - [ ] T-005 Servidor MCP por stdio con `recall`
 - [ ] T-006 Harness de evaluación mínimo con modelos falsos
 
@@ -162,7 +162,7 @@ Las listas "Tocar solo", dependencias y criterios de este archivo ya incorporan 
 - **Implementa:** FR-1, FR-9 (fuente `episodes.vector`), FR-22 (parte) · **Decisión:** ADR-0001, ADR-0006, ADR-0007
 - **Depende de:** T-003
 - **Leer antes:** docs/architecture.md#7-api-del-servicio · docs/architecture.md#8-api-pública-del-paquete-go
-- **Tocar solo:** mnemo.go, types.go, providers.go, internal/store/tx.go, internal/store/episodes.go, internal/httpapi/episodes.go, internal/httpapi/recall.go, test/e2e/skeleton_test.go, go.mod, go.sum
+- **Tocar solo:** mnemo.go, types.go, providers.go, internal/store/tx.go, internal/store/episodes.go, internal/httpapi/episodes.go, internal/httpapi/recall.go, test/e2e/skeleton_test.go, go.mod, go.sum, internal/httpapi/server.go, cmd/mnemo/main.go, mnemo_test.go, integration_test.go, internal/store/episodes_test.go, internal/httpapi/episodes_test.go (open-questions §3, fila T-004 de "Tocar solo")
 - **No tocar:** internal/store/migrations/0001_init.sql
 - **Interfaces:**
   - *Produce:* `mnemo.Open(ctx, pool, mnemo.Config) (*mnemo.Memory, error)`; `(*Memory).Scope(tenantID [16]byte, subjectID string) *Scope`; `(*Scope).Remember(ctx, []mnemo.Message, ...mnemo.RememberOption) (mnemo.RememberResult, error)`; `(*Scope).Recall(ctx, query string, ...mnemo.RecallOption) (mnemo.RecallResult, error)`; interfaz `mnemo.Embedder { Embed(ctx, []string) ([][]float32, mnemo.Usage, error); Dim() int }`; `mnemo.FakeEmbedder(dim int) mnemo.Embedder`; `store.WithScope(ctx, pool, store.Scope, func(pgx.Tx) error) error`.
@@ -221,7 +221,7 @@ Las listas "Tocar solo", dependencias y criterios de este archivo ya incorporan 
 - **Implementa:** FR-23 (parte) · **Decisión:** ADR-0006, ADR-0007 (decisión 14)
 - **Depende de:** T-004
 - **Leer antes:** docs/adr/ADR-0006-puertos-de-modelos-y-dimension.md · docs/quality-baseline.md#4-estabilidad
-- **Tocar solo:** internal/provider/chat.go, internal/provider/embed.go, internal/provider/retry.go, internal/provider/provider_test.go, providers.go
+- **Tocar solo:** internal/provider/chat.go, internal/provider/embed.go, internal/provider/retry.go, internal/provider/provider_test.go, providers.go, cmd/mnemo/main.go (open-questions §3, fila T-007 de `newEmbedder`)
 - **No tocar:** internal/store/**, go.mod
 - **Interfaces:**
   - *Produce:* `mnemo.ChatModel { Complete(ctx, mnemo.ChatRequest) (mnemo.ChatResponse, error) }` con `ChatRequest{System, User string; JSONSchema []byte; MaxTokens int}` y `ChatResponse{Text string; Usage mnemo.Usage}`; `mnemo.Usage{InputTokens, OutputTokens int; Provider, Model string}`; `mnemo.OpenAICompatibleChat(baseURL, apiKey, model string) mnemo.ChatModel`; `mnemo.OpenAICompatibleEmbedder(baseURL, apiKey, model string, dim int) mnemo.Embedder`.

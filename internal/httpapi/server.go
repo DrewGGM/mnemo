@@ -3,8 +3,11 @@ package httpapi
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"time"
+
+	"github.com/DrewGGM/mnemo"
 )
 
 // readyTimeout bounds the readiness check so a hung database turns into a
@@ -16,13 +19,22 @@ type Deps struct {
 	// Ready reports whether the service can take traffic. Its error never
 	// reaches the response body.
 	Ready func(ctx context.Context) error
+	// Memory serves the /v1 routes.
+	Memory *mnemo.Memory
+	// Logger records the errors that a response hides. Nil discards them.
+	Logger *slog.Logger
 }
 
 // NewServer returns the handler for every route of the service.
 func NewServer(deps Deps) http.Handler {
+	if deps.Logger == nil {
+		deps.Logger = slog.New(slog.DiscardHandler)
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", healthz)
 	mux.HandleFunc("GET /readyz", readyz(deps.Ready))
+	mux.HandleFunc("POST /v1/episodes", deps.postEpisodes)
+	mux.HandleFunc("POST /v1/recall", deps.postRecall)
 	return mux
 }
 

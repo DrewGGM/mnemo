@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/DrewGGM/mnemo"
 	"github.com/DrewGGM/mnemo/internal/config"
 	"github.com/DrewGGM/mnemo/internal/httpapi"
 	"github.com/DrewGGM/mnemo/internal/store"
@@ -86,6 +87,14 @@ func runServe(ctx context.Context, getenv func(string) string, logger *slog.Logg
 		return err
 	}
 	defer pool.Close()
+	embedder, err := newEmbedder(cfg, logger)
+	if err != nil {
+		return err
+	}
+	mem, err := mnemo.Open(ctx, pool, mnemo.Config{Embedder: embedder})
+	if err != nil {
+		return err
+	}
 	ready := func(ctx context.Context) error {
 		err := store.Ready(ctx, pool)
 		if err != nil {
@@ -93,7 +102,18 @@ func runServe(ctx context.Context, getenv func(string) string, logger *slog.Logg
 		}
 		return err
 	}
-	return serve(ctx, cfg, httpapi.Deps{Ready: ready}, logger)
+	return serve(ctx, cfg, httpapi.Deps{Ready: ready, Memory: mem, Logger: logger}, logger)
+}
+
+// newEmbedder returns the deterministic fake embedder while this build has no
+// adapter for a real one, and refuses to start if a real one is configured,
+// so a deployment never believes it embeds with a model it is not using.
+func newEmbedder(cfg config.Config, logger *slog.Logger) (mnemo.Embedder, error) {
+	if cfg.EmbedBaseURL != "" {
+		return nil, errors.New("MNEMO_EMBED_BASE_URL is set, but this build has no embedding adapter; unset it to use the fake embedder")
+	}
+	logger.Warn("MNEMO_EMBED_BASE_URL is not set: embedding with the deterministic fake embedder, which is meant for tests only")
+	return mnemo.FakeEmbedder(cfg.EmbedDim), nil
 }
 
 func serve(ctx context.Context, cfg config.Config, deps httpapi.Deps, logger *slog.Logger) error {

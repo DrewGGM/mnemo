@@ -28,7 +28,7 @@ Las listas "Tocar solo", dependencias y criterios de este archivo ya incorporan 
 - [x] T-000 Resolver las decisiones abiertas que bloquean el plan ([ADR-0007](../adr/ADR-0007-operaciones-sin-inquilino-y-ajustes-del-plan.md))
 
 ### M0 — Esqueleto andante
-- [ ] T-001 Módulo Go, binario `mnemo serve` y `/healthz`
+- [x] T-001 Módulo Go, binario `mnemo serve` y `/healthz`
 - [ ] T-002 PostgreSQL en Docker, migraciones y `/readyz`
 - [ ] T-003 Imagen, CI y comprobadores de arquitectura y dependencias
 - [ ] T-004 Guardar y recuperar episodios de punta a punta (solo vector)

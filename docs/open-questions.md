@@ -63,12 +63,16 @@ Huecos que el plan manda rellenar. Cada fila se completa con fecha y dato al cer
 | Tarea | Qué se anota | Cierra | Dato |
 |---|---|---|---|
 | T-002 | Resumen de la imagen fijada | Q-8, A-9 | pendiente |
+| T-002 | Licencia de `github.com/jackc/pgx/v5` comprobada al añadirla; si no es MIT, se corrige la tabla de [security-baseline.md §8](security-baseline.md#8-cadena-de-suministro). Origen: T-001, 2026-11-21 (T-001 no trae la dependencia y no puede tocar `docs/`) | Cita de memoria en security-baseline §8 | pendiente |
 | T-003 | Primera ejecución del CI en GitHub, en verde | Compuerta de seguridad (cadena de suministro) | pendiente |
+| T-003 | CONTRIBUTING.md §2 dice "Go ≥ 1.24", pero `go.mod` exige `go 1.26.0` (lo imponen `golang.org/x/vuln` v1.10.0 y `honnef.co/go/tools` v0.8.2) y fija `toolchain go1.26.11` por vulnerabilidades de la biblioteca estándar alcanzables con versiones anteriores (p. ej. GO-2026-5039, `net/textproto`). Cambiar §2 a "Go ≥ 1.26; `go.mod` fija `toolchain go1.26.11`". Origen: T-001, 2026-11-21 | — | pendiente |
+| T-004 | Licencia de `github.com/pgvector/pgvector-go` comprobada al añadirla, con la misma corrección. Origen: T-001, 2026-11-21 | Cita de memoria en security-baseline §8 | pendiente |
 | T-005 | Versión del SDK de MCP fijada y revisiones de protocolo que declara | — | pendiente |
 | T-007 | Resultado de la prueba `live`: salida JSON con esquema y vector de 1.024 dimensiones | A-4, A-5 | pendiente |
 | T-008 | Fracción de sesiones repetidas entre preguntas | A-6 | pendiente |
 | T-011 | Decisión de M1: seguir; seguir con corrida final reducida; o plan B de R-1 | Q-1, A-2 | pendiente |
 | T-012 | Si la decisión de M1 sigue aplazada al empezar M2, constancia de que M2 empieza sin ella y con el riesgo R-1 abierto (ADR-0007, decisión 13) | — | pendiente |
+| T-013 | El `http.Server` de `cmd/mnemo` fija `ReadHeaderTimeout`, `ReadTimeout` e `IdleTimeout`, pero no `WriteTimeout`: se fija por encima del mayor tiempo de espera de proveedor de `recall` y `remember`, o se documenta que el plazo de cada petición sale del contexto. Origen: T-001, 2026-11-21 | TH-11 (agotamiento) | pendiente |
 | T-023 | Formato real de respuesta del reranker | — | pendiente |
 | T-029 | Revisión de protocolo negociada con el cliente del SDK | — | pendiente |
 | T-032 | p95 de `recall` con 50.000 episodios | A-7 | pendiente |

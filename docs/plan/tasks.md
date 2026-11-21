@@ -29,7 +29,7 @@ Las listas "Tocar solo", dependencias y criterios de este archivo ya incorporan 
 
 ### M0 — Esqueleto andante
 - [x] T-001 Módulo Go, binario `mnemo serve` y `/healthz`
-- [ ] T-002 PostgreSQL en Docker, migraciones y `/readyz`
+- [x] T-002 PostgreSQL en Docker, migraciones y `/readyz`
 - [ ] T-003 Imagen, CI y comprobadores de arquitectura y dependencias
 - [ ] T-004 Guardar y recuperar episodios de punta a punta (solo vector)
 - [ ] T-005 Servidor MCP por stdio con `recall`

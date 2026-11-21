@@ -14,9 +14,12 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/modelcontextprotocol/go-sdk/mcp"
+
 	"github.com/DrewGGM/mnemo"
 	"github.com/DrewGGM/mnemo/internal/config"
 	"github.com/DrewGGM/mnemo/internal/httpapi"
+	"github.com/DrewGGM/mnemo/internal/mcpserver"
 	"github.com/DrewGGM/mnemo/internal/store"
 )
 
@@ -32,7 +35,15 @@ const (
 // see the credential of the role that bypasses row level security (ADR-0007).
 const adminURLVar = "MNEMO_ADMIN_DATABASE_URL"
 
-var errUsage = errors.New("usage: mnemo serve | mnemo migrate")
+// mcpSubjectVar names the subject whose memory `mnemo mcp` serves until a
+// credential binds it (T-029).
+const mcpSubjectVar = "MNEMO_MCP_SUBJECT"
+
+// devTenant is the development tenant inserted by 0001_init.sql, the only
+// one `mnemo mcp` serves until a credential names the tenant (T-029).
+var devTenant = [16]byte{15: 1}
+
+var errUsage = errors.New("usage: mnemo serve | mnemo migrate | mnemo mcp")
 
 func main() {
 	os.Exit(run(os.Args[1:], os.Getenv, os.Stderr))
@@ -50,6 +61,8 @@ func run(args []string, getenv func(string) string, logOut io.Writer) int {
 			err = runServe(ctx, getenv, logger)
 		case "migrate":
 			err = runMigrate(ctx, getenv, logger)
+		case "mcp":
+			err = runMCP(ctx, getenv, logger)
 		}
 	}
 	switch {
@@ -103,6 +116,40 @@ func runServe(ctx context.Context, getenv func(string) string, logger *slog.Logg
 		return err
 	}
 	return serve(ctx, cfg, httpapi.Deps{Ready: ready, Memory: mem, Logger: logger}, logger)
+}
+
+// runMCP serves MCP over stdin and stdout, so every log line goes to
+// logger, which writes to stderr; it is also made the default logger, which
+// internal/mcpserver logs tool failures with.
+func runMCP(ctx context.Context, getenv func(string) string, logger *slog.Logger) error {
+	slog.SetDefault(logger)
+	cfg, err := config.Load(getenv)
+	if err != nil {
+		return fmt.Errorf("invalid configuration: %w", err)
+	}
+	subject := getenv(mcpSubjectVar)
+	if subject == "" {
+		return errors.New(mcpSubjectVar + " is required")
+	}
+	pool, err := store.OpenPool(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+	embedder, err := newEmbedder(cfg, logger)
+	if err != nil {
+		return err
+	}
+	mem, err := mnemo.Open(ctx, pool, mnemo.Config{Embedder: embedder})
+	if err != nil {
+		return err
+	}
+	err = mcpserver.New(mem.Scope(devTenant, subject)).Run(ctx, &mcp.StdioTransport{})
+	if ctx.Err() != nil {
+		logger.Info("stopped")
+		return nil
+	}
+	return err
 }
 
 // newEmbedder returns the deterministic fake embedder while this build has no

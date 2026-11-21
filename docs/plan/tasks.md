@@ -32,7 +32,7 @@ Las listas "Tocar solo", dependencias y criterios de este archivo ya incorporan 
 - [x] T-002 PostgreSQL en Docker, migraciones y `/readyz`
 - [x] T-003 Imagen, CI y comprobadores de arquitectura y dependencias
 - [x] T-004 Guardar y recuperar episodios de punta a punta (solo vector)
-- [ ] T-005 Servidor MCP por stdio con `recall`
+- [x] T-005 Servidor MCP por stdio con `recall`
 - [ ] T-006 Harness de evaluación mínimo con modelos falsos
 
 *Punto de control: una petición real atraviesa API → dominio → PostgreSQL → respuesta, por REST y por MCP; el CI la ejecuta; el harness produce una tabla.*

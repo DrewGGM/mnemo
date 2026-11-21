@@ -169,7 +169,7 @@ func serve(ctx context.Context, cfg config.Config, deps httpapi.Deps, logger *sl
 		return err
 	}
 	if !isLoopback(ln.Addr()) {
-		logger.Warn("listening on a non-loopback address; terminate TLS in a proxy in front of mnemo", "addr", ln.Addr().String())
+		logger.Warn("listening on a non-loopback address, but /v1 has no authentication in this build: anyone who reaches this address can read and write the memory of every subject; publish it on loopback only, and terminate TLS in a proxy in front of mnemo", "addr", ln.Addr().String())
 	}
 	srv := &http.Server{
 		Handler:           httpapi.NewServer(deps),

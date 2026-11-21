@@ -1,6 +1,6 @@
 # mnemo — plan: hitos, dependencias y comprobación de consistencia
 
-Estado: comprobación inicial hecha, sin código · Última revisión: 2026-11-21 (decisiones de [ADR-0007](../adr/ADR-0007-operaciones-sin-inquilino-y-ajustes-del-plan.md))
+Estado: M0 cerrado en local el 2026-11-21, con el CI sin ejecutar (F-21) · Última revisión: 2026-11-21 (cierre de M0)
 
 Las tareas están en [tasks.md](tasks.md). Este archivo guarda lo que se mira por encima de una tarea: los hitos, el grafo de dependencias y la comprobación de consistencia entre [prd.md](../prd.md), [architecture.md](../architecture.md), los [ADR](../adr/README.md) y el plan. La comprobación se repite al cerrar cada hito ([tasks.md, Definición de hecho](tasks.md#definición-de-hecho)).
 
@@ -108,7 +108,7 @@ Camino más largo en número de tareas (las tareas no tienen duración estimada,
 
 ## 3. Comprobación de consistencia
 
-Última ejecución: 2026-11-20, antes de escribir código. Pasadas: cobertura de requisitos, trazabilidad de cada tarea, contradicciones con los ADR aceptados, coherencia entre documentos (modelo de datos, reglas de módulos, comandos) y listas "Tocar solo". Solo lectura: lo no trivial queda como hallazgo y, si hace falta una decisión, como pregunta en [open-questions.md](../open-questions.md).
+Ejecuciones: 2026-11-20, antes de escribir código; 2026-11-21, al cerrar M0 (las notas "Cierre de M0" de cada apartado y §3.6). Pasadas: cobertura de requisitos, trazabilidad de cada tarea, contradicciones con los ADR aceptados, coherencia entre documentos (modelo de datos, reglas de módulos, comandos) y listas "Tocar solo". Solo lectura: lo no trivial queda como hallazgo y, si hace falta una decisión, como pregunta en [open-questions.md](../open-questions.md).
 
 ### 3.1 Requisitos → tareas → prueba
 
@@ -141,6 +141,8 @@ La columna **Prueba** es la que exige [testing-strategy.md §6](../testing-strat
 | FR-23 | Consumo y tiempos por etapa | T-007, T-016, T-032 | `TestFR23_` (patrón); `TestUsage_EveryProviderCallRecorded` | Cubierto |
 | FR-24 | Harness de un comando | T-006, T-008, T-009, T-011, T-032, T-033, T-034, T-035 | Harness (`mnemo-eval`), fuera de `fr-trace` | Cubierto |
 | FR-25 | Un comando levanta servicio y base | T-001, T-002, T-003, T-036 | Humo: `docker compose up -d --wait && curl -fsS http://127.0.0.1:8080/readyz` | Cubierto |
+
+Cierre de M0 (2026-11-21). Implementado en parte, con pruebas en el código: FR-1 (episodio inmutable: `TestEpisodes_*` en `integration_test.go`, `internal/store` e `internal/httpapi`; `TestFR1_` llega con T-015), FR-9 (solo la fuente vectorial: `TestRecall_Deterministic`, `TestRecall_OrdersByCosineSimilarity`), FR-21 (`recall` por stdio con el sujeto fijado por `MNEMO_MCP_SUBJECT`: `TestRecall_InputSchemaHasNoSubjectOrTenant`, `TestRecall_ReturnsWhatRememberStored`), FR-22 (paquete raíz con `Open`, `Scope`, `Remember`, `Recall`), FR-24 (`mnemo-eval run` con `smoke.yaml` y modelos falsos) y FR-25 (el humo pasa en local). Ningún FR cambia de tareas ni de prueba, y la cobertura sigue en 25/25. Sin `TestFR<n>_` todavía, como prevé el plan.
 
 ### 3.2 Tareas → requisito y decisión
 
@@ -183,6 +185,8 @@ La columna **Prueba** es la que exige [testing-strategy.md §6](../testing-strat
 | T-035 | M4 | FR-24 | ADR-0004, ADR-0007 (decisión 14) |
 | T-036 | M4 | FR-25 | security-baseline §8, ADR-0007 |
 
+Cierre de M0 (2026-11-21): T-001 a T-006 están hechas y cada una implementa lo que dice su fila. T-003, T-004 y T-006 ampliaron su lista "Tocar solo" dentro de la propia tarea con una fila en [open-questions.md §3](../open-questions.md#3-anotaciones-que-deja-una-tarea); la regla está en Q-25, abierta. Siete archivos con anotaciones pendientes no están en ninguna lista "Tocar solo" de una tarea por hacer (F-22).
+
 Decisiones reversibles de la [espina](../architecture.md#11-espina-de-decisiones) sin tarea que las cite: AD-2 (la aplican todas las tareas de `internal/store`), AD-5 (T-002 la materializa con la etiqueta `integration` y `MNEMO_TEST_DATABASE_URL`), AD-6 (T-013, 429 `RATE_LIMITED`). No es un hueco: son reglas transversales.
 
 ### 3.3 ADR aceptados → tareas
@@ -196,6 +200,9 @@ Decisiones reversibles de la [espina](../architecture.md#11-espina-de-decisiones
 | ADR-0005 Extracción asíncrona, lectura sin modelo generativo | T-015, T-019, T-026 | …llame a `ChatModel` desde `recall`; T-015 lo prueba y T-024 deja fuera el resumen con modelo | Sin contradicción; desviación transitoria F-20 |
 | ADR-0006 Puertos y dimensión 1.024 | T-004, T-007, T-016, T-023 | …use otra dimensión (T-001 exige `MNEMO_EMBED_DIM` = 1024) o un SDK de proveedor | Sin contradicción; F-10 resuelto (T-016 registra el modelo) |
 | ADR-0007 Operaciones sin inquilino y ajustes del plan | T-001 … T-007, T-009 … T-012, T-014 … T-017, T-020, T-021, T-023 … T-031, T-034 … T-036 (T-007, T-009, T-011, T-023, T-034 y T-035 solo por la decisión 14) | …dé a `mnemo_app` acceso sin `app.tenant_id` fuera de las tres funciones aprobadas, o importe `internal/store` desde `internal/httpapi` o `internal/mcpserver` | Sin contradicción |
+| ADR-0008 Dependencias de Python del harness | T-006 | …añada al harness una dependencia de Python sin fila en el ADR, o un cliente HTTP de terceros en lugar de `urllib` | Sin contradicción |
+
+Cierre de M0 (2026-11-21), contra el código: dos dependencias directas de Go, `pgx/v5` y el SDK de MCP (`depbudget -max 6`), sin otro almacén (ADR-0001); `mnemo_app` es `NOBYPASSRLS` y no es dueño de nada, y la URL de `mnemo_admin` solo la recibe el servicio `admin` de Compose (ADR-0003, ADR-0007); `go run ./tools/archcheck` pasa, así que `internal/httpapi` e `internal/mcpserver` solo importan el raíz e `internal/config` (A-14); `FakeEmbedder` de 1.024 dimensiones y ningún SDK de proveedor (ADR-0006); el protocolo `smoke.yaml` se identifica por su SHA-256 y el lector y el juez son falsos, sin cifras de terceros (ADR-0004). La RLS sigue sin activar hasta T-012: es la desviación declarada F-20, no una contradicción nueva.
 
 ### 3.4 Hallazgos
 
@@ -220,13 +227,31 @@ Decisiones reversibles de la [espina](../architecture.md#11-espina-de-decisiones
 | F-17 | Trazabilidad | LOW | T-031 | "Implementa" cita secciones de testing-strategy en lugar de un FR o ADR; traza FR-1 … FR-23 de forma indirecta | Aceptado: es la tarea de trazabilidad | Aceptado |
 | F-18 | Infraespecificación | LOW | architecture §7, T-024, T-029 | Idioma de las etiquetas del contexto y de los mensajes de error sin fijar | Q-23, supuesto A-12 | Resuelto 2026-11-21 (ADR-0007), decisión 12 |
 | F-19 | Infraespecificación | LOW | tasks.md, reglas 1 y 4 | Sin formato de mensaje de commit ni nombre de rama | Q-24, supuesto A-11 | Resuelto 2026-11-21 (ADR-0007), decisión 12 |
-| F-20 | Desviación transitoria declarada | LOW | T-004 (inquilino de desarrollo sin autenticación hasta T-012); T-010 (extracción en la petición hasta T-015); T-005 (`MNEMO_MCP_SUBJECT` hasta T-029) | Cada una contradice un ADR durante M0-M1 y la cierra una tarea nombrada | Aceptado; vigilar que T-012, T-015 y T-029 retiren el atajo (lo exigen en su "Hecho cuando") | Aceptado; vigilar en T-012, T-015 y T-029 |
+| F-20 | Desviación transitoria declarada | LOW | T-004 (inquilino de desarrollo sin autenticación hasta T-012); T-010 (extracción en la petición hasta T-015); T-005 (`MNEMO_MCP_SUBJECT` hasta T-029) | Cada una contradice un ADR durante M0-M1 y la cierra una tarea nombrada | Aceptado; vigilar que T-012, T-015 y T-029 retiren el atajo (lo exigen en su "Hecho cuando") | Aceptado; vigilar en T-012, T-015 y T-029. 2026-11-21 (cierre de M0): el atajo de T-004 incluye que aún no hay RLS ni credencial; el arranque avisa de que `/v1` no está autenticado fuera de bucle local y el README dice que la imagen no se publica antes de T-012 ([open-questions.md §3](../open-questions.md#3-anotaciones-que-deja-una-tarea), filas T-012 del cierre de M0) |
+| F-21 | Punto de control de hito | HIGH | M0, "el CI la ejecuta"; T-003 | Ninguna ejecución del CI ha arrancado: las de los pushes de T-003 a T-006 terminan en 2-3 s sin trabajos porque GitHub no los inicia por la facturación de la cuenta. N1 a N4 pasan en local, pero el CI nunca ha corrido en verde, y las compuertas automáticas que compensan el revisor único (AR-7) no operan | El autor resuelve la facturación y relanza la última ejecución; si falla, se corrige antes de T-007 | Abierto 2026-11-21: pendiente del autor (fila T-003 de open-questions §3) |
+| F-22 | Listas "Tocar solo" | MEDIUM | `docker-compose.yml`, `Dockerfile`, `.dockerignore`, `docs/security-baseline.md`, `internal/config/config.go`, `internal/store/migrate_test.go`, `.gitattributes` | Tienen anotaciones pendientes en open-questions §3 (ejemplo de `tenant create`, endurecimiento de contenedores, estado de security-baseline §8 y §10, variables de modelos que se ignoran, nombres de pruebas, `eol` de `go.mod`), pero ninguna tarea por hacer los lista, y la regla 5 impide tocarlos | Asignar cada uno a una tarea (T-012, T-031 o T-036) antes de empezarla, o abrir una tarea de mantenimiento; depende de Q-25 | Abierto 2026-11-21 |
+| F-23 | Documentación frente al código | LOW | README.md, CONTRIBUTING.md §6, security-baseline.md | El README decía "design phase" y "No application code yet"; CONTRIBUTING §6 listaba `tenant create`, `key create`, `fetch`, `report` y `verify-protocol` sin la tarea que los crea, en contra de su propia regla; security-baseline sigue diciendo "controles sin implementar" y que el CI no existe | README y CONTRIBUTING §6 corregidos en el cierre de M0; security-baseline, en F-22 | README y CONTRIBUTING resueltos 2026-11-21; security-baseline abierto (F-22) |
 
 ### 3.5 Métricas
 
 Requisitos 25 · Tareas 36 · Cobertura de FR 100 % (25/25) · Tareas sin FR ni decisión 0 · Contradicciones con un ADR aceptado 0 (2 tensiones HIGH: F-1, F-2) · Hallazgos: HIGH 3 · MEDIUM 6 · LOW 11.
 
 Actualización del 2026-11-21: ADR-0007 resuelve F-1 a F-12, F-14 a F-16, F-18 y F-19 (los tres HIGH entre ellos). Queda abierto F-13, asignado a T-036, que lista el documento que corrige; F-17 y F-20 están aceptados.
+
+Cierre de M0 (2026-11-21): Requisitos 25 · Tareas 36 (hechas T-001 a T-006, más la previa T-000) · Cobertura de FR 100 % (25/25) · Tareas sin FR ni decisión 0 · ADR aceptados 8 · Contradicciones con un ADR aceptado 0 · Hallazgos nuevos: HIGH 1 (F-21) · MEDIUM 1 (F-22) · LOW 1 (F-23). Abiertos: F-13, F-21, F-22 y la parte de security-baseline de F-23; aceptados: F-17 y F-20.
+
+### 3.6 Riesgos del PRD releídos
+
+Cierre de M0 (2026-11-21), contra la [lista de riesgos](../prd.md#dependencies--risks):
+
+- **R-1** (la extracción no supera al top-k vectorial): sin cambios. M0 no lo mide; el harness ya corre de punta a punta con modelos falsos, y la señal se lee en T-011.
+- **R-2** (coste de ingesta): sin dato. Sigue sin cuenta de modelo de chat ni de embeddings (primera dependencia del PRD), así que T-007 (prueba `live`), T-009 (corrida real) y T-011 quedan pendientes del autor. Es lo que más amenaza la fecha de M1 (2026-12-27).
+- **R-3** (el alcance no cabe): M0 terminó el 2026-11-21, antes de su fecha objetivo (2026-12-06), pero las horas no se han medido; la señal temprana sigue siendo el cierre de M2.
+- **R-4** (número cuestionado): sin cambios; el identificador de protocolo es el SHA-256 del YAML y `.gitattributes` lo mantiene en LF para que coincida entre Windows y el CI.
+- **R-5** (fuga entre inquilinos): la probabilidad sube mientras no haya RLS ni credencial (F-20). Hoy la contienen el filtro escrito a mano (`TestEpisodes_OtherSubjectSeesNone`) y la publicación en `127.0.0.1`; la suite de aislamiento llega con T-012.
+- **R-6** (cambio de modelo o precio): sin modelos fijados todavía.
+- **Riesgo nuevo, sin fila en el PRD:** el CI no se ejecuta por la facturación de la cuenta de GitHub (F-21). Mientras dure, ninguna compuerta automática corre después del push, y A-8/AR-7 (un solo revisor, compensado con compuertas automáticas) pierde su compensación. Se propone añadirlo al PRD como R-7 si no se resuelve antes de T-007.
+- **Dependencia del SDK de MCP:** la fila del PRD dice que existe una versión posterior a v1.8.0; T-005 comprobó que v1.9.0 solo tiene versiones previas y fijó v1.8.0 ([open-questions.md §3](../open-questions.md#3-anotaciones-que-deja-una-tarea), fila T-005).
 
 ## 4. Cómo repetir la comprobación
 

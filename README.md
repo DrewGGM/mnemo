@@ -2,7 +2,7 @@
 
 Long-term memory for LLM agents, as a small Go library and a self-hostable service backed by PostgreSQL and nothing else.
 
-**Status: design phase.** No application code yet. This repository currently holds the specification, the architecture, the evaluation protocol and the ordered implementation plan. Every benchmark cell below says "pending" until the harness has produced it.
+**Status: walking skeleton (milestone M0 of [docs/plan](docs/plan/README.md)).** The service stores messages as episodes and recalls them by vector similarity over REST and MCP (stdio); the evaluation harness runs end to end with fake models. Fact extraction, hybrid retrieval, tenants and authentication are not built yet, and embeddings come from a deterministic fake until a real adapter exists. Every benchmark cell below says "pending" until the harness has produced it.
 
 ## The problem
 
@@ -62,6 +62,19 @@ agent / app ──REST / MCP / Go API──▶ mnemo ──SQL──▶ PostgreS
 
 Details, diagrams, data model and API: [docs/architecture.md](docs/architecture.md).
 
+## Running the skeleton
+
+Requires Docker with Compose. The stack builds the image on first start (add `--build` after a change), starts PostgreSQL, applies the migrations and publishes the service on `127.0.0.1:8080`:
+
+```
+docker compose up -d --wait
+curl -fsS http://127.0.0.1:8080/readyz
+curl -fsS -X POST http://127.0.0.1:8080/v1/episodes -H 'Content-Type: application/json' -d '{"subject":"demo","session_id":"s-1","messages":[{"role":"user","content":"I moved to Medellin last spring"}]}'
+curl -fsS -X POST http://127.0.0.1:8080/v1/recall -H 'Content-Type: application/json' -d '{"subject":"demo","query":"where do I live?","max_tokens":500}'
+```
+
+`/v1` has no authentication yet: every request uses a development tenant, and the caller names the subject. Do not publish the image or the port beyond loopback, and do not store real conversations in it, until credentials land (task T-012 of the plan). Commands for tests, linters and the harness are in [CONTRIBUTING.md](CONTRIBUTING.md) (Spanish).
+
 ## Repository layout
 
 ```
@@ -79,9 +92,17 @@ docs/
   evaluation-plan.md     benchmarks, metrics, baselines, ablations
   open-questions.md      unresolved points and assumptions to confirm
   plan/              milestones and the ordered task list
+*.go                 root package: the public Go API
+cmd/mnemo/           binary: serve, migrate, mcp
+internal/            config, store (all SQL and migrations), httpapi, mcpserver
+deploy/initdb/       database roles created on first start
+test/e2e/            end-to-end test against the Compose stack
+tools/               architecture and dependency checkers run in CI
+eval/                Python evaluation harness (mnemo-eval)
+Dockerfile, docker-compose.yml
 ```
 
-Planned once implementation starts: `cmd/mnemo/` (binary), the root Go package (public API), `internal/` (store, extraction, resolution, retrieval, policy, providers, HTTP, MCP), `api/openapi.yaml`, `eval/` (Python harness), `docker-compose.yml`.
+Still planned: extraction, resolution, retrieval, policy and provider packages under `internal/`, and `api/openapi.yaml`.
 
 The documents under `docs/` are written in Spanish.
 

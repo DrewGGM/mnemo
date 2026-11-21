@@ -157,25 +157,25 @@ En la tabla, `\|` es la barra vertical escapada para Markdown; en la shell se es
 ### Servicio y harness
 
 ```
-mnemo migrate
-mnemo serve
-mnemo mcp
-mnemo tenant create <nombre>
-mnemo key create --tenant <id> --scopes <lista> [--subject <id>]
+mnemo migrate                                                       (T-002)
+mnemo serve                                                         (T-001)
+mnemo mcp                                                           (T-005)
+mnemo tenant create <nombre>                                        (T-012)
+mnemo key create --tenant <id> --scopes <lista> [--subject <id>]    (T-012)
 ```
 
-`migrate`, `tenant create` y `key create` necesitan `MNEMO_ADMIN_DATABASE_URL`. Con Compose se ejecutan en un contenedor efímero del servicio `admin`, no en el servicio `mnemo`: `docker compose run --rm -T admin tenant create <nombre>`.
+`migrate`, `tenant create` y `key create` necesitan `MNEMO_ADMIN_DATABASE_URL`. Con Compose se ejecutan en un contenedor efímero del servicio `admin`, no en el servicio `mnemo`: `docker compose run --rm -T admin migrate` (y, desde T-012, `docker compose run --rm -T admin tenant create <nombre>`).
 
 Reproducción del benchmark ([docs/evaluation-plan.md §11](docs/evaluation-plan.md#11-reproducción)):
 
 ```
 docker compose up -d --wait
-uv run --project eval mnemo-eval fetch
-uv run --project eval mnemo-eval run --protocol eval/config/protocol.yaml --arms all
-uv run --project eval mnemo-eval report --out eval/results/
+uv run --project eval mnemo-eval fetch                                               (T-008)
+uv run --project eval mnemo-eval run --protocol eval/config/protocol.yaml --arms all (T-009 crea protocol.yaml)
+uv run --project eval mnemo-eval report --out eval/results/                         (T-009)
 ```
 
-Comprobación de que los resultados no mezclan protocolos: `uv run --project eval mnemo-eval verify-protocol eval/results`.
+Comprobación de que los resultados no mezclan protocolos (T-009): `uv run --project eval mnemo-eval verify-protocol eval/results`.
 
 ## 7. Definición de hecho
 

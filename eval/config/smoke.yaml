@@ -1,0 +1,12 @@
+# Minimal evaluation for CI: two toy conversations, fake reader and judge,
+# no paid calls. Its SHA-256 is the protocol id written in every result line.
+dataset: ../fixtures/toy.json
+reader: fake
+judge: fake
+arms:
+  B0:
+    memory: none
+  B2:
+    memory: recall
+    recall:
+      max_tokens: 8000

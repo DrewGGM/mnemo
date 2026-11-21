@@ -1,5 +1,5 @@
-# Stages 1 to 5 of docs/quality-baseline.md §7 for Go. Actions are pinned by
-# full commit SHA, with the tag in a comment (docs/security-baseline.md §8).
+# Stages 1 to 6 of docs/quality-baseline.md §7. Actions are pinned by full
+# commit SHA, with the tag in a comment (docs/security-baseline.md §8).
 name: ci
 
 on:
@@ -11,6 +11,34 @@ permissions:
   contents: read
 
 jobs:
+  python:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.11.19"
+          enable-cache: false
+
+      - name: uv sync
+        run: uv sync --frozen --project eval
+
+      - name: ruff check
+        run: uv run --frozen --project eval ruff check eval
+
+      - name: ruff format
+        run: uv run --frozen --project eval ruff format --check eval
+
+      - name: pytest
+        run: uv run --frozen --project eval pytest eval/tests
+
+      - name: pip-audit
+        run: uv run --frozen --project eval pip-audit
+
   go:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -113,6 +141,19 @@ jobs:
           elapsed=$(( $(date +%s) - start ))
           echo "ready after ${elapsed}s"
           test "$elapsed" -lt 60
+
+      - name: End-to-end test
+        run: go test -tags=e2e ./test/e2e
+
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.11.19"
+          enable-cache: false
+
+      - name: Minimal evaluation
+        run: |
+          uv sync --frozen --project eval
+          uv run --frozen --project eval mnemo-eval run --protocol eval/config/smoke.yaml --arms all
 
       - name: Compose logs
         if: failure()

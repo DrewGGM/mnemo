@@ -33,7 +33,7 @@ Las listas "Tocar solo", dependencias y criterios de este archivo ya incorporan 
 - [x] T-003 Imagen, CI y comprobadores de arquitectura y dependencias
 - [x] T-004 Guardar y recuperar episodios de punta a punta (solo vector)
 - [x] T-005 Servidor MCP por stdio con `recall`
-- [ ] T-006 Harness de evaluación mínimo con modelos falsos
+- [x] T-006 Harness de evaluación mínimo con modelos falsos
 
 *Punto de control: una petición real atraviesa API → dominio → PostgreSQL → respuesta, por REST y por MCP; el CI la ejecuta; el harness produce una tabla.*
 
@@ -255,7 +255,7 @@ Las listas "Tocar solo", dependencias y criterios de este archivo ya incorporan 
 - **Implementa:** FR-24 · **Decisión:** ADR-0004, ADR-0007 (decisión 14)
 - **Depende de:** T-007, T-008
 - **Leer antes:** docs/evaluation-plan.md#3-brazos · docs/evaluation-plan.md#5-métricas
-- **Tocar solo:** eval/src/mnemo_eval/arms.py, eval/src/mnemo_eval/models.py, eval/src/mnemo_eval/judge.py, eval/src/mnemo_eval/metrics.py, eval/src/mnemo_eval/report.py, eval/src/mnemo_eval/prompts/reader.txt, eval/tests/test_metrics.py, eval/config/protocol.yaml
+- **Tocar solo:** eval/src/mnemo_eval/arms.py, eval/src/mnemo_eval/models.py, eval/src/mnemo_eval/judge.py, eval/src/mnemo_eval/metrics.py, eval/src/mnemo_eval/report.py, eval/src/mnemo_eval/prompts/reader.txt, eval/tests/test_metrics.py, eval/config/protocol.yaml, eval/src/mnemo_eval/pipeline.py, eval/src/mnemo_eval/cli.py (open-questions §3, fila T-009 de lo que deja T-006)
 - **No tocar:** internal/**, eval/src/mnemo_eval/datasets/**
 - **Interfaces:**
   - *Consume:* `MnemoClient`, `Question`, `split`.

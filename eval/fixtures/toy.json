@@ -1,0 +1,47 @@
+{
+  "questions": [
+    {
+      "question_id": "toy-dog",
+      "type": "single-session-user",
+      "question": "What is my dog called?",
+      "question_date": "2026-03-12T09:00:00Z",
+      "answer": "Toby",
+      "sessions": [
+        {
+          "session_id": "s1",
+          "date": "2026-03-10T15:04:00Z",
+          "messages": [
+            {"role": "user", "content": "My dog is called Toby."},
+            {"role": "assistant", "content": "Nice to meet Toby! How old is he?"},
+            {"role": "user", "content": "He turned three in January."}
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "toy-city",
+      "type": "knowledge-update",
+      "question": "Which city did I move to last spring?",
+      "question_date": "2026-06-01T09:00:00Z",
+      "answer": "Medellin",
+      "sessions": [
+        {
+          "session_id": "s1",
+          "date": "2026-01-05T18:30:00Z",
+          "messages": [
+            {"role": "user", "content": "I live in Bogota and work from home."},
+            {"role": "assistant", "content": "Working from home sounds comfortable."}
+          ]
+        },
+        {
+          "session_id": "s2",
+          "date": "2026-04-20T10:00:00Z",
+          "messages": [
+            {"role": "user", "content": "Big news: I moved to Medellin last spring."},
+            {"role": "assistant", "content": "Congratulations on the move!"}
+          ]
+        }
+      ]
+    }
+  ]
+}

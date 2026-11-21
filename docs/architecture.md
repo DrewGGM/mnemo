@@ -1,6 +1,6 @@
 # mnemo — arquitectura
 
-Estado: aceptada para implementación · Última revisión: 2026-11-19
+Estado: aceptada para implementación · Última revisión: 2026-11-21 ([ADR-0007](adr/ADR-0007-operaciones-sin-inquilino-y-ajustes-del-plan.md))
 
 Requisitos en [prd.md](prd.md). Decisiones irreversibles en [adr/](adr/README.md).
 
@@ -193,8 +193,8 @@ Transiciones prohibidas, con prueba: `superseded → active`, `retracted → act
 |---|---|---|
 | `mnemo` (raíz, público) | La API pública y los tipos | `Open`, `Memory`, `Scope` (sección 8) |
 | `internal/store` | Esquema, migraciones, todas las consultas SQL, el contexto de inquilino para RLS | Funciones por caso de uso; nadie más escribe SQL |
-| `internal/extract` | Prompt y esquema de extracción, validación de la salida, detección de texto con forma de instrucción | `Extract(ctx, window) ([]Candidate, Usage, error)` |
-| `internal/resolve` | **Núcleo puro**: máquina de estados de hechos y cálculo de transiciones | `Plan(cand, existing, verdict) []Transition` |
+| `internal/extract` | Prompt y esquema de extracción, validación de la salida, detección de texto con forma de instrucción | `Extract(ctx, chat, w Window) ([]Candidate, Usage, error)` |
+| `internal/resolve` | **Núcleo puro**: máquina de estados de hechos y cálculo de transiciones | `Plan(c, existing, v, now) ([]Transition, error)` |
 | `internal/retrieve` | **Núcleo puro**: fusión RRF, filtros temporales, ensamblado del contexto | `FuseRRF`, `FilterAsOf`, `Assemble` |
 | `internal/policy` | **Núcleo puro**: puntuación de decaimiento, selección de duplicados | `DecayScore`, `MergeGroups` |
 | `internal/provider` | Adaptadores HTTP de chat, embeddings y reranker; tiempos límite, reintentos, consumo | Interfaces `ChatModel`, `Embedder`, `Reranker` |
@@ -204,7 +204,7 @@ Transiciones prohibidas, con prueba: `superseded → active`, `retracted → act
 | `cmd/mnemo` | Composición: configuración, subcomandos `serve`, `mcp`, `migrate`, `tenant`, `key` | — |
 | `eval/` (Python) | Harness, cargadores de datos, líneas base, juez, informes, cliente HTTP | Línea de comandos `mnemo-eval` |
 
-Reglas de dependencia, verificadas en CI: los tres núcleos puros no importan `internal/store`, `internal/provider`, `net/http` ni `database/sql`; `internal/httpapi` e `internal/mcpserver` solo importan el paquete raíz; el paquete raíz no importa el SDK de MCP ni `net/http` en modo servidor.
+Reglas de dependencia, verificadas en CI por `tools/archcheck`: los tres núcleos puros no importan `internal/store`, `internal/provider`, `net/http` ni `database/sql`; de los paquetes del módulo, `internal/httpapi` e `internal/mcpserver` solo importan el paquete raíz e `internal/config` (la verificación de credenciales la expone el raíz como `(*Memory).Authenticate`; ADR-0007); el paquete raíz no importa el SDK de MCP ni `net/http` en modo servidor; `cmd/mnemo` compone y puede importar cualquier paquete interno.
 
 Relación entre contextos: el harness es *conformista* respecto al formato de los benchmarks; mnemo se protege de los proveedores de modelos con una *capa anticorrupción* (`internal/provider`), y publica un *servicio de anfitrión abierto* (REST con OpenAPI, MCP).
 
@@ -274,7 +274,7 @@ erDiagram
 
 ### Tablas
 
-Todas llevan `tenant_id uuid not null` salvo `tenants` y `schema_migrations`. Identificadores `uuid` generados con `gen_random_uuid()`.
+Todas llevan `tenant_id uuid not null` salvo `tenants`, `schema_migrations` e `instance_settings`. Identificadores `uuid` generados con `gen_random_uuid()`.
 
 ```sql
 tenants(id uuid pk, name text unique, fts_config regconfig default 'english', created_at timestamptz)
@@ -314,22 +314,28 @@ facts(id uuid pk, tenant_id, subject_id text,
       embedding vector(1024) null, fts tsvector,
       check (valid_to is null or valid_from is null or valid_to >= valid_from))
 
-fact_sources(tenant_id, fact_id uuid references facts on delete cascade,
-             episode_id uuid references episodes on delete set null, primary key (fact_id, episode_id))
+fact_sources(id bigserial pk, tenant_id,
+             fact_id uuid not null references facts on delete cascade,
+             episode_id uuid null references episodes on delete set null,
+             session_id text not null, seq int not null,          -- instantánea de procedencia,
+             occurred_at timestamptz not null, role text not null, -- copiada al insertar (ADR-0007)
+             unique (tenant_id, fact_id, session_id, seq))
 
-jobs(id uuid pk, tenant_id, subject_id text null,
+jobs(id uuid pk, tenant_id, subject_id text not null,
      kind text check (kind in ('extract','embed','consolidate','forget','purge')),
      dedupe_key text, payload jsonb,
      status text check (status in ('queued','running','done','failed','cancelled')),
      attempts int default 0, run_after timestamptz default now(), locked_at timestamptz null,
      error text null, result jsonb null, created_at, finished_at timestamptz null,
-     unique (tenant_id, kind, dedupe_key))
+     unique (tenant_id, subject_id, kind, dedupe_key))   -- session_id solo es único por sujeto (ADR-0007)
 
 usage_events(id bigserial pk, tenant_id, subject_id text null, operation text, provider text,
              model text, input_tokens int, output_tokens int, duration_ms int, job_id uuid null, created_at)
 
-idempotency_keys(tenant_id, key text, request_hash bytea, status_code int, response jsonb,
-                 created_at, primary key (tenant_id, key))
+idempotency_keys(tenant_id, key text, subject_id text not null, request_hash bytea,
+                 status_code int, response jsonb, created_at, primary key (tenant_id, subject_id, key))
+
+instance_settings(key text pk, value text not null)   -- sin datos de inquilino; guarda el modelo de embeddings (ADR-0006, ADR-0007)
 
 audit_log(id bigserial pk, tenant_id, api_key_id uuid, action text, subject_ref bytea,
           target text, detail jsonb, at timestamptz default now())   -- solo INSERT
@@ -342,8 +348,11 @@ audit_log(id bigserial pk, tenant_id, api_key_id uuid, action text, subject_ref 
 - GIN sobre `fts` en `facts` y `episodes`; GIN de trigramas sobre `entities.name_norm`.
 - **Sin índice vectorial en v1.** La búsqueda es `order by embedding <=> $1` restringida por `(tenant_id, subject_id)`, exacta, sobre unos miles de filas. Se revisa con A-7.
 - `audit_log.subject_ref` es `sha256(tenant_id || subject_id)`: permite demostrar que una purga ocurrió sin conservar el identificador.
+- `fact_sources` conserva la procedencia aunque el episodio desaparezca. Al resumir, sus filas se reapuntan al episodio `summary` y la instantánea (`session_id`, `seq`, `occurred_at`, `role`) conserva la ronda original; si un episodio se borra por otra vía, `episode_id` pasa a nulo y la instantánea sigue ahí.
 
-Seguridad a nivel de fila: `alter table … enable row level security; force row level security;` y la política `using (tenant_id = current_setting('app.tenant_id')::uuid)` en todas las tablas con `tenant_id`. La aplicación se conecta con un rol sin `BYPASSRLS` ni propiedad de las tablas, y ejecuta `set local app.tenant_id` al abrir cada transacción. Las migraciones usan otro rol. Ver ADR-0003.
+Seguridad a nivel de fila: `alter table … enable row level security; force row level security;` y la política `using (tenant_id = current_setting('app.tenant_id')::uuid)` en todas las tablas con `tenant_id`. La aplicación se conecta con un rol sin `BYPASSRLS` ni propiedad de las tablas, y ejecuta `set local app.tenant_id` al abrir cada transacción. Las migraciones usan otro rol (`mnemo_admin`, con `BYPASSRLS`), cuya URL (`MNEMO_ADMIN_DATABASE_URL`) solo leen `mnemo migrate`, `mnemo tenant create` y `mnemo key create`; el servicio no la tiene. `mnemo_app` recibe tabla por tabla `SELECT, INSERT, UPDATE, DELETE` o menos, nunca `TRUNCATE` (no pasa por RLS) ni `TRIGGER`. Ver ADR-0003 y ADR-0007.
+
+Tres operaciones no conocen el inquilino de antemano y pasan por funciones `SECURITY DEFINER` de `mnemo_admin`, con `search_path` fijado, sin parámetros de inquilino y con `EXECUTE` solo para `mnemo_app`: `mnemo_lookup_api_key(p_key_hash)` (devuelve inquilino, credencial, ámbitos y sujeto), `mnemo_claim_job()` (retira los trabajos abandonados, turno entre inquilinos y `FOR UPDATE SKIP LOCKED`; devuelve el trabajo y su inquilino) y `mnemo_cleanup()` (limpieza por antigüedad). Todo lo que sigue va bajo `set local app.tenant_id`. Como `mnemo_admin` es dueño con `BYPASSRLS`, `mnemo_app` no recibe privilegios sobre vistas materializadas ni sobre vistas sin `security_invoker = true`. Ver ADR-0007.
 
 ### Consistencia e idempotencia
 
@@ -352,12 +361,12 @@ Consistencia fuerte dentro de PostgreSQL; nada eventual salvo la extracción, qu
 | Operación mutante | Clave | Almacén | TTL | Repetición | En curso |
 |---|---|---|---|---|---|
 | `POST /v1/episodes` | Cabecera `Idempotency-Key` (opcional) y, siempre, la clave natural `(tenant, subject, session_id, seq)` | `idempotency_keys`, escrita en la misma transacción que los episodios | 24 h | Misma clave y cuerpo → respuesta original. Misma clave, otro cuerpo → 409 `IDEMPOTENCY_CONFLICT`. Mismo `(session_id, seq)` con otro contenido → 409 `EPISODE_CONFLICT` | La segunda petición espera el bloqueo de fila y recibe la respuesta guardada |
-| Trabajo `extract` | `dedupe_key = session_id:seq_desde-seq_hasta` | `jobs` (único) | permanente | Reejecutar produce las mismas transiciones o `duplicate`; nunca un segundo hecho activo (I3) | `FOR UPDATE SKIP LOCKED` |
-| `POST …/consolidate`, `POST …/forget` | `dedupe_key = fecha UTC` | `jobs` | 24 h | Devuelve el trabajo existente | idem |
-| `DELETE /v1/subjects/{id}` | El propio sujeto | `subjects.purged_at` | permanente | Idempotente: la segunda llamada devuelve el recibo con ceros | La marca `purged_at` hace fallar cualquier escritura tardía |
+| Trabajo `extract` | `dedupe_key = session_id:seq_desde-seq_hasta`, única por sujeto | `jobs` (único por `tenant_id, subject_id, kind, dedupe_key`) | permanente | Reejecutar produce las mismas transiciones o `duplicate`; nunca un segundo hecho activo (I3) | `FOR UPDATE SKIP LOCKED` |
+| `POST …/consolidate`, `POST …/forget` | `dedupe_key = fecha UTC`, única por sujeto | `jobs` | 24 h | Devuelve el trabajo existente | idem |
+| `DELETE /v1/subjects/{id}` | El propio sujeto | `subjects.purged_at` | permanente | Idempotente: la segunda llamada con una credencial del inquilino no ligada a sujeto devuelve el recibo con ceros; la credencial ligada al sujeto purgado ya no existe y recibe 401 (ADR-0007, decisión 10) | La marca `purged_at` hace fallar cualquier escritura tardía |
 | `POST /v1/facts/{id}/retract` | El hecho | estado | permanente | Idempotente | — |
 
-Cada elemento de acumulación tiene su reciclaje: `idempotency_keys` (24 h), `jobs` terminados (30 días), `usage_events` (180 días), los tres con un trabajo de limpieza diario.
+Cada elemento de acumulación tiene su reciclaje: `idempotency_keys` (24 h), `jobs` terminados (30 días, salvo los `extract` en `failed`, que retira la purga), `usage_events` (180 días), los tres con una limpieza diaria del trabajador por `mnemo_cleanup()`.
 
 ### Migraciones
 
@@ -408,7 +417,7 @@ Petición y respuesta de `recall`:
     "id": "…", "statement": "Vive en Bogotá", "predicate": "lives_in",
     "valid_from": "2026-03-10T00:00:00Z", "valid_to": "2026-08-02T00:00:00Z",
     "status": "superseded", "trust": "user", "score": 0.031,
-    "sources": [{"episode_id": "…", "occurred_at": "2026-03-10T15:04:00Z"}]
+    "sources": [{"episode_id": "…", "session_id": "s-7", "seq": 3, "occurred_at": "2026-03-10T15:04:00Z", "role": "user"}]
   }],
   "episodes": [{"id": "…", "session_id": "s-7", "seq": 4, "role": "user", "content": "…", "occurred_at": "…", "score": 0.027}],
   "context": "<memory>\n[hecho · válido 2026-03-10 → 2026-08-02] Vive en Bogotá\n…\n</memory>",
@@ -418,6 +427,8 @@ Petición y respuesta de `recall`:
   "timings_ms": {"embed": 31, "candidates": 12, "fuse": 0, "rerank": 0, "assemble": 1, "total": 46}
 }
 ```
+
+En cada procedencia de `sources`, `session_id`, `seq`, `occurred_at` y `role` están siempre; `episode_id` es nulo si el episodio de origen ya no existe (ADR-0007, decisión 4).
 
 Sobre de error único, nunca 200 con error:
 
@@ -449,7 +460,7 @@ Firmas previstas. Ruta de importación según el supuesto A-1.
 ```go
 package mnemo
 
-func Migrate(ctx context.Context, pool *pgxpool.Pool) error
+func Migrate(ctx context.Context, adminURL string) error  // URL de mnemo_admin, dueño del esquema (ADR-0007, decisión 17)
 func Open(ctx context.Context, pool *pgxpool.Pool, cfg Config) (*Memory, error)
 
 type Config struct {
@@ -462,6 +473,7 @@ type Config struct {
 
 func (m *Memory) Scope(tenantID uuid, subjectID string) *Scope
 func (m *Memory) RunWorker(ctx context.Context) error   // bloquea hasta que ctx termina
+func (m *Memory) Authenticate(ctx context.Context, plaintext string) (Principal, error) // ADR-0007, decisión 3
 
 func (s *Scope) Remember(ctx context.Context, msgs []Message, opts ...RememberOption) (RememberResult, error)
 func (s *Scope) Recall(ctx context.Context, query string, opts ...RecallOption) (RecallResult, error)
@@ -507,7 +519,7 @@ prompt := system + "\n" + r.Context
 
 **Decaimiento.** `score = importance × 0,5^(edad_días / 90) × (1 + ln(1 + access_count))`. Se archiva si `score < 0,05` y la última confirmación tiene más de 30 días. Valores iniciales; la ablación A8 los varía.
 
-**Consolidación.** Grupos de hechos activos del mismo sujeto y entidad-sujeto con similitud coseno ≥ 0,92 → se conserva el más reciente, hereda las procedencias y los demás pasan a `archived` con `superseded_by` apuntándole (no a `superseded`: no dejaron de ser ciertos, solo sobran, y no deben aparecer como historia). Resumen de sesión: una llamada al modelo por sesión fuera de la ventana de retención; se guarda como episodio de rol `summary` y se borran los originales solo si su trabajo `extract` terminó en `done`.
+**Consolidación.** Grupos de hechos activos del mismo sujeto y entidad-sujeto con similitud coseno ≥ 0,92 → se conserva el más reciente, hereda las procedencias (unión de las filas de `fact_sources`) y los demás pasan a `archived` con `superseded_by` apuntándole (no a `superseded`: no dejaron de ser ciertos, solo sobran, y no deben aparecer como historia). Resumen de sesión: una llamada al modelo por sesión fuera de la ventana de retención; se guarda como episodio de rol `summary`, las filas de `fact_sources` de los originales se reapuntan a él y se borran los originales, todo en una transacción y solo si ningún trabajo `extract` de la sesión está `queued`, `running` o `failed` (un `done` ya retirado por la limpieza cuenta como terminado; ADR-0007, decisión 4).
 
 ## 10. Lo que deliberadamente no se construye todavía
 
@@ -540,7 +552,7 @@ Decisiones reversibles tomadas localmente, que el trabajo posterior debe respeta
 - **Afecta a:** FR-11. **Evita:** una dependencia de tokenizador por modelo. **Regla:** las tokens reales del lector las mide el harness con el `usage` del proveedor; mnemo solo promete un presupuesto aproximado.
 
 ### AD-5 — Pruebas de integración contra el PostgreSQL de `docker compose`
-- **Afecta a:** pruebas. **Evita:** una dependencia de contenedores en el módulo. **Regla:** etiqueta de compilación `integration` y variable `MNEMO_TEST_DATABASE_URL`; cada prueba crea su propio inquilino.
+- **Afecta a:** pruebas. **Evita:** una dependencia de contenedores en el módulo. **Regla:** etiqueta de compilación `integration` y variable `MNEMO_TEST_DATABASE_URL`; cada prueba crea su propio inquilino, y la que reclama trabajos o limpia (ejecuta `mnemo_claim_job()` o `mnemo_cleanup()`, que actúan sobre todos los inquilinos) corre en una base propia de `storetest.IsolatedDB` (ADR-0007, decisión 2).
 
 ### AD-6 — Límite de tasa en memoria por credencial
 - **Afecta a:** servicio. **Evita:** Redis. **Regla:** cubo de fichas por `api_key_id`; válido mientras haya una sola instancia (ligado a "varias réplicas" en la sección 10).

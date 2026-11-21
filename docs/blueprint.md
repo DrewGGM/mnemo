@@ -7,7 +7,7 @@ status: design
 
 # mnemo — índice del diseño
 
-**Estado: fase de diseño.** Sin código. Especificación, arquitectura, línea base y plan escritos; la comprobación de consistencia inicial está en [plan/README.md](plan/README.md#3-comprobación-de-consistencia) y tiene tres hallazgos HIGH que se resuelven antes de la tarea a la que bloquean (T-003, T-010, T-012). Primera tarea: T-001, pendiente del supuesto A-1.
+**Estado: fase de diseño.** Sin código. Especificación, arquitectura, línea base y plan escritos; la comprobación de consistencia inicial está en [plan/README.md](plan/README.md#3-comprobación-de-consistencia). Sus tres hallazgos HIGH y las preguntas Q-3 y Q-13 a Q-24 quedaron resueltos el 2026-11-21 en [ADR-0007](adr/ADR-0007-operaciones-sin-inquilino-y-ajustes-del-plan.md) (T-000). Primera tarea: T-001, con el supuesto A-1 confirmado.
 
 mnemo es una capa de memoria de largo plazo para agentes LLM: biblioteca y servicio en Go, solo PostgreSQL, episodios inmutables y hechos bitemporales que se sustituyen, aislamiento por RLS, servidor MCP y un resultado reproducible en LongMemEval_S frente a tres líneas base.
 
@@ -28,13 +28,14 @@ mnemo es una capa de memoria de largo plazo para agentes LLM: biblioteca y servi
 | [ADR-0004](adr/ADR-0004-benchmark-titular-y-protocolo.md) | LongMemEval_S como titular, LoCoMo como secundario, protocolo registrado antes de medir |
 | [ADR-0005](adr/ADR-0005-extraccion-asincrona-en-postgres.md) | Escritura en dos fases con cola en PostgreSQL; `recall` sin modelo generativo |
 | [ADR-0006](adr/ADR-0006-puertos-de-modelos-y-dimension.md) | Puertos HTTP compatibles con OpenAI, sin SDK de proveedor; Qwen3-Embedding-0.6B a 1.024 dimensiones |
+| [ADR-0007](adr/ADR-0007-operaciones-sin-inquilino-y-ajustes-del-plan.md) | Tres funciones `SECURITY DEFINER` para lo que no conoce el inquilino; HTTP y MCP importan solo el raíz e `internal/config`; procedencia con instantánea en `fact_sources`; listas "Tocar solo", orden de tareas, CI y convenciones corregidos antes de T-001 |
 | [security-baseline.md](security-baseline.md) | ASVS nivel 2 (nivel 3 en aislamiento y supresión), diagrama de flujo de datos, amenazas TH-1 … TH-19, casos de abuso AB-1 … AB-7, supresión, cadena de suministro, riesgos aceptados AR-1 … AR-7 |
 | [quality-baseline.md](quality-baseline.md) | Funciones de aptitud con su comando, sensores, reglas de código, estabilidad por punto de integración, SLO, observabilidad, etapas de CI, deuda D-1 … D-7 |
 | [testing-strategy.md](testing-strategy.md) | Tipos de prueba y cobertura por componente según criticidad, niveles de validación N1-N4, pruebas primero, diseño de casos, trazabilidad `TestFR<n>_` |
 | [evaluation-plan.md](evaluation-plan.md) | Conjuntos, división `dev60` / 440 retenidas, brazos B0, B1, B2, M y ablaciones A1 … A9, protocolo, métricas, tabla de resultados, cifras de terceros, validación del juez, análisis de fallos, presupuesto, reproducción |
-| [open-questions.md](open-questions.md) | Preguntas abiertas Q-1 … Q-24, seguimiento de supuestos A-1 … A-15 y anotaciones que deja cada tarea |
+| [open-questions.md](open-questions.md) | Preguntas Q-1 … Q-24 (Q-3 y Q-13 … Q-24 resueltas en ADR-0007), seguimiento de supuestos A-1 … A-15 y anotaciones que deja cada tarea |
 | [plan/README.md](plan/README.md) | Hitos M0 … M4 con fecha, grafo de dependencias, matriz FR → tarea → prueba, tarea → decisión, ADR → tareas, hallazgos F-1 … F-20 |
-| [plan/tasks.md](plan/tasks.md) | Las 36 tareas en orden, cada una con requisito, decisión, archivos, interfaces, criterios, comando Verificar y riesgo; Definición de hecho |
+| [plan/tasks.md](plan/tasks.md) | T-000 (decisiones previas) y las 36 tareas en orden, cada una con requisito, decisión, archivos, interfaces, criterios, comando Verificar y riesgo; Definición de hecho |
 
 Artefactos que crea una tarea y aún no existen: `api/openapi.yaml` (T-013), `eval/config/smoke.yaml` (T-006), `eval/config/protocol.yaml` (T-008), `docs/failure-analysis.md` (T-035), `CHANGELOG.md` y `.env.example` (T-036).
 

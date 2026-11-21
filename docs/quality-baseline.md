@@ -1,6 +1,6 @@
 # mnemo — línea base de calidad y fiabilidad
 
-Estado: definida, sin código · Última revisión: 2026-11-19
+Estado: definida, sin código · Última revisión: 2026-11-21 ([ADR-0007](adr/ADR-0007-operaciones-sin-inquilino-y-ajustes-del-plan.md))
 
 Cada regla de este documento es un comando que falla con código distinto de cero. Lo que no se puede ejecutar no es una regla. Todos los comandos asumen una shell POSIX (en Windows, Git Bash) desde la raíz del repositorio.
 
@@ -10,17 +10,18 @@ Una por característica de arquitectura, como mínimo.
 
 | Característica | Función de aptitud | Comando | Cuándo | Umbral |
 |---|---|---|---|---|
-| **Evaluabilidad** (rectora) | Cada fuente de `recall` se apaga por petición y el resultado es determinista con el embebedor falso | `go test ./internal/retrieve ./internal/store -tags=integration -run 'TestRecall_(SourcesToggle|Deterministic)'` | cada cambio | 0 fallos |
+| **Evaluabilidad** (rectora) | Cada fuente de `recall` se apaga por petición y el resultado es determinista con el embebedor falso | `go test ./... -tags=integration -run 'TestFR9_SourcesToggle|TestRecall_Deterministic'` | cada cambio | 0 fallos |
 | Evaluabilidad | Toda llamada a un modelo deja una fila en `usage_events` | `go test ./... -tags=integration -run TestUsage_EveryProviderCallRecorded` | cada cambio | 0 llamadas sin registrar |
 | Evaluabilidad | Un archivo de resultados no mezcla protocolos | `uv run --project eval mnemo-eval verify-protocol eval/results` | cada cambio en `eval/` | 0 mezclas |
-| Aislamiento | Ninguna tabla con `tenant_id` devuelve filas ajenas, ni con SQL sin filtro | `go test ./internal/store -tags=integration -run 'TestIsolation_|TestRLS_|TestAppRole_'` | cada cambio | 0 filas |
+| Aislamiento | Ninguna tabla con `tenant_id` devuelve filas ajenas, ni con SQL sin filtro; solo las funciones `SECURITY DEFINER` aprobadas en ADR-0007 saltan RLS, `mnemo_app` no lee vistas que se evalúen con los permisos de `mnemo_admin`, y no tiene `TRUNCATE` (que no pasa por RLS) ni `TRIGGER` sobre ninguna tabla | `go test ./internal/store -tags=integration -run 'TestIsolation_|TestRLS_|TestAppRole_'` | cada cambio | 0 filas; 0 funciones no aprobadas; 0 vistas de dueño accesibles; 0 tablas con `TRUNCATE` o `TRIGGER` para `mnemo_app` |
 | Integridad temporal | Propiedades de la máquina de estados de hechos | `go test ./internal/resolve -run 'TestProp_' -count=1` | cada cambio | 0 contraejemplos |
 | Integridad temporal | Sustitución bajo concurrencia | `go test ./internal/store -tags=integration -run TestSupersede_Concurrent -count=20` | cada cambio | 0 cadenas con dos activos |
 | Instalabilidad | Arranque con un comando | `docker compose up -d --wait && curl -fsS http://127.0.0.1:8080/readyz` | cada cambio en `main` | 200 en < 60 s |
-| Instalabilidad | Presupuesto de dependencias | `go run ./tools/depbudget -max 6` | cada cambio | ≤ 6 directas |
+| Instalabilidad | Presupuesto de dependencias y ningún cliente de otra base, cola o caché (lista negra desde T-031, ADR-0001) | `go run ./tools/depbudget -max 6` | cada cambio | ≤ 6 directas; 0 de la lista negra |
+| Evaluabilidad | `store.EnsureSetting`, sobre la que `mnemo serve` y `mnemo mcp` comprueban al arrancar el modelo de embeddings registrado, falla nombrando ambos valores si el configurado es otro (ADR-0006, decisión 4; ADR-0007, decisión 11; T-016) | `go test ./internal/store -tags=integration -run TestSettings_EmbedModelMismatchFails` | cada cambio | 0 discrepancias aceptadas |
 | Rendimiento | Latencia de `recall` sobre un sujeto con 5.000 hechos y 10.000 episodios, 8 clientes, embebedor falso | `go test ./test/perf -tags=perf -run TestRecall_P95 -timeout 10m` | antes de cada versión | p95 ≤ 400 ms |
 | Borrabilidad | Tras la purga, ninguna tabla con `subject_id` conserva filas (se descubren por `information_schema`) | `go test ./internal/store -tags=integration -run TestPurge_NoRowsLeftAnyTable` | cada cambio | 0 filas |
-| Modularidad | Los núcleos puros no importan E/S; HTTP y MCP solo importan el paquete raíz | `go run ./tools/archcheck` | cada cambio | 0 violaciones |
+| Modularidad | Los núcleos puros no importan E/S; HTTP y MCP solo importan el paquete raíz e `internal/config` | `go run ./tools/archcheck` | cada cambio | 0 violaciones |
 | Seguridad | Sin vulnerabilidades alcanzables | `go tool govulncheck ./... && uv run --project eval pip-audit` | cada cambio | 0 |
 | Contrato | Las rutas implementadas coinciden con `api/openapi.yaml` | `go test ./internal/httpapi -run TestContract_RoutesMatchOpenAPI` | cada cambio | 0 diferencias |
 | Privacidad | Un texto centinela no aparece en registros ni métricas | `go test ./test/e2e -tags=e2e -run TestLogs_NoContentLeak` | cada cambio | 0 apariciones |
@@ -36,14 +37,14 @@ Una por característica de arquitectura, como mínimo.
 | Análisis estático | `go vet ./... && go tool staticcheck ./...` | gancho de pre-commit y CI |
 | Pruebas unitarias | `go test ./...` | gancho de pre-commit y CI |
 | Pruebas de integración | `go test -tags=integration ./...` | CI |
-| Cobertura | `go test -tags=integration -coverprofile=coverage.out ./... && go run ./tools/covergate` | CI (umbral por paquete y caída máxima de 2 puntos) |
+| Cobertura | `go test -tags=integration -coverprofile=coverage.out ./... && go run ./tools/covergate -profile coverage.out` | CI (umbral por paquete y caída máxima de 2 puntos) |
 | Arquitectura y dependencias | `go run ./tools/archcheck && go run ./tools/depbudget -max 6` | CI |
 | Python | `uv run --project eval ruff check eval && uv run --project eval ruff format --check eval && uv run --project eval pytest eval/tests` | gancho de pre-commit y CI |
 | Vulnerabilidades | `go tool govulncheck ./...` | CI |
 
 `staticcheck` y `govulncheck` se fijan como herramientas en `go.mod` (directiva `tool`, disponible desde Go 1.24), de modo que su versión viaja con el repositorio y no cuentan como dependencias del presupuesto.
 
-Se montan en T-001 y T-003, antes de cualquier funcionalidad.
+Se montan en T-001 y T-003, antes de cualquier funcionalidad. El gancho de pre-commit es `.githooks/pre-commit`, versionado: lo crea T-003 con las líneas de Go y T-006 le añade las de Python; se activa con `git config core.hooksPath .githooks` (ADR-0007, decisión 9).
 
 ## 3. Reglas de código
 
@@ -130,6 +131,8 @@ Etapas, en GitHub Actions, con acciones fijadas por SHA:
 5. **Humo:** `docker compose up -d --wait`, `/readyz`, y la prueba de punta a punta.
 6. **Evaluación mínima:** el harness contra dos conversaciones de juguete con modelos falsos, para comprobar que la tubería completa produce una tabla. Sin llamadas de pago en CI.
 7. **Versión (solo etiquetas):** imagen de contenedor, SBOM, resumen de resultados adjunto.
+
+T-003 monta las etapas 1 a 5 de Go; T-006 añade las de Python (`uv sync --frozen`, `ruff`, `pytest`, `pip-audit`), la prueba de punta a punta de la etapa 5 y la etapa 6 (ADR-0007, decisión 9); T-031 añade la cobertura y la trazabilidad; T-036, la etapa 7.
 
 Las corridas reales del benchmark no van en CI: cuestan dinero y se lanzan a mano sobre un commit etiquetado.
 

@@ -11,25 +11,29 @@ Estado: fase de diseño, sin código. Los comandos que dependen de un programa o
 | `docs/` y `CONTRIBUTING.md` | Español |
 | `README.md` | Inglés |
 | Identificadores de código y nombres de prueba | Inglés, con los términos del [glosario](docs/prd.md#glossary) tal cual: `Episode`, `Fact`, `Entity`, `Scope`, `Supersede`, `Retract`, `Purge` |
-| Comentarios de documentación, mensajes de registro y textos que ve un cliente | Inglés `[SUPUESTO A-12]`, pendiente de [Q-23](docs/open-questions.md) |
-| Mensajes de commit | Español `[SUPUESTO A-11]`, pendiente de [Q-24](docs/open-questions.md) |
+| Comentarios de documentación, mensajes de registro y textos que ve un cliente | Inglés (A-12, confirmado en [ADR-0007](docs/adr/ADR-0007-operaciones-sin-inquilino-y-ajustes-del-plan.md)) |
+| Mensajes de commit | Español (A-11, confirmado en ADR-0007) |
 
 ## 2. Entorno
 
 - Shell POSIX (en Windows, Git Bash), desde la raíz del repositorio.
 - Go ≥ 1.24 (directiva `tool` en `go.mod`), Docker con Compose, `uv`.
 - Secretos solo por variables de entorno; `.env` está ignorado por git. `.env.example` llega con T-036.
+- El servicio `db` de Compose publica PostgreSQL en `127.0.0.1:55432` (variable `MNEMO_DB_PORT`), no en 5432, para no chocar con un PostgreSQL local. Las URL de prueba apuntan ahí: `postgres://mnemo_app:<contraseña>@127.0.0.1:55432/mnemo?sslmode=disable` y lo mismo con `mnemo_admin`; las contraseñas de desarrollo están en `docker-compose.yml` (T-002).
+- Gancho de pre-commit versionado (desde T-003): `git config core.hooksPath .githooks` una vez por clon.
 
 Variables:
 
 | Variable | Para qué | Desde |
 |---|---|---|
-| `MNEMO_DATABASE_URL` | Conexión del servicio (obligatoria) | T-001 |
+| `MNEMO_DATABASE_URL` | Conexión del servicio con el rol `mnemo_app` (obligatoria) | T-001 |
+| `MNEMO_ADMIN_DATABASE_URL` | Conexión con el rol `mnemo_admin`; solo la leen `mnemo migrate`, `mnemo tenant create` y `mnemo key create`, nunca `serve` ni `mcp`. En Compose solo la tiene el servicio de una vez `admin` (ADR-0007, decisión 2) | T-002 |
 | `MNEMO_LISTEN_ADDR` | Dirección de escucha; por defecto `127.0.0.1:8080` | T-001 |
 | `MNEMO_LLM_BASE_URL`, `MNEMO_LLM_API_KEY`, `MNEMO_LLM_MODEL` | Modelo de chat compatible con OpenAI | T-001 |
 | `MNEMO_EMBED_BASE_URL`, `MNEMO_EMBED_API_KEY`, `MNEMO_EMBED_MODEL` | Modelo de embeddings | T-001 |
 | `MNEMO_EMBED_DIM` | Debe ser `1024` o el proceso no arranca (ADR-0006) | T-001 |
 | `MNEMO_RERANK_URL` | Reranker opcional | T-001 |
+| `MNEMO_DB_PORT` | Puerto del host en el que Compose publica la base; por defecto `55432` | T-002 |
 | `MNEMO_TEST_DATABASE_URL` | Pruebas de integración, rol `mnemo_app` | T-002 |
 | `MNEMO_TEST_ADMIN_DATABASE_URL` | Pruebas de integración, rol `mnemo_admin` (migraciones) | T-002 |
 | `MNEMO_MCP_SUBJECT` | Sujeto de `mnemo mcp` hasta que exista la credencial | T-005, se retira en T-029 |
@@ -41,7 +45,8 @@ El mapa completo está en [docs/architecture.md §5](docs/architecture.md#5-mód
 
 - **SQL solo en `internal/store`**, siempre parametrizado y dentro de una transacción con `app.tenant_id` (`store.WithScope`). Ningún otro paquete importa `pgx`, salvo el raíz para el tipo del pool (AD-2).
 - **Núcleos puros:** `internal/resolve`, `internal/retrieve` e `internal/policy` no importan `internal/store`, `internal/provider`, `net/http` ni `database/sql`; no leen el reloj (reciben `now`) ni generan identificadores.
-- **`internal/httpapi` e `internal/mcpserver`** solo traducen hacia el paquete raíz. La regla exacta tiene una discrepancia abierta ([Q-14](docs/open-questions.md)); vale la que aplique `tools/archcheck`.
+- **`internal/httpapi` e `internal/mcpserver`** solo traducen hacia el paquete raíz: de los paquetes del módulo importan solo el raíz e `internal/config`. La verificación de credenciales es `(*mnemo.Memory).Authenticate` (A-14, ADR-0007). `tools/archcheck` lo aplica.
+- **Operaciones sin inquilino conocido** (buscar una credencial, reclamar un trabajo, limpieza) solo por las tres funciones `SECURITY DEFINER` de ADR-0007. Añadir otra es cambiar ese ADR; `TestRLS_DefinerFunctionsApproved` falla si aparece una no aprobada.
 - **El paquete raíz** no importa el SDK de MCP ni `net/http` en modo servidor.
 - **Modelos solo tras los puertos** `ChatModel`, `Embedder`, `Reranker`, implementados en `internal/provider` con la biblioteca estándar. Sin SDK de proveedor ni framework de LLM (ADR-0006).
 - **Solo PostgreSQL** como almacén (ADR-0001). Ninguna cola, caché ni base adicional.
@@ -88,10 +93,14 @@ En criticidad ALTA (`internal/resolve`, aislamiento, autenticación, purga) la p
 
 ### Commits, ramas y versiones
 
-`[SUPUESTO A-11]` hasta que se resuelva [Q-24](docs/open-questions.md):
+Convención confirmada (A-11, ADR-0007, decisión 12):
 
-- Rama por tarea: `t-NNN-<slug>`, desde `main`, con un único commit; se integra en `main` por avance rápido con el CI en verde.
-- Primera línea: `T-NNN: <título de la tarea en el índice>`. Cuerpo: el comando Verificar y su salida.
+- Rama por tarea: `t-NNN-<slug>`, desde `main`, con un único commit. Se integra con `git checkout main && git merge --ff-only t-NNN-<slug> && git branch -d t-NNN-<slug> && git push origin main`.
+- Primera línea: `T-NNN: <título de la tarea en el índice>`. Cuerpo: el comando Verificar y su salida, con el resultado y el código de salida. La casilla del índice se marca en el mismo commit.
+- Tras el push se mira la ejecución del CI. Si falla, la corrección va en un commit `T-NNN: corrige CI (<motivo>)` antes de empezar la tarea siguiente.
+- T-000 (decisiones previas, ADR-0007) sigue el mismo formato.
+
+Criterios que exigen modelos reales, gasto o etiquetado humano (T-007, T-009, T-011, T-023, T-034, T-035): se implementa todo el código con sus pruebas con falsos; lo que falta se anota en [docs/open-questions.md §3](docs/open-questions.md#3-anotaciones-que-deja-una-tarea) con fecha y el comando que lo completa, y la tarea se marca en el índice con el sufijo "· parcial (open-questions §3)" (ADR-0007, decisión 14). Nunca se inventa una cifra.
 
 Fijado por los documentos:
 
@@ -101,7 +110,7 @@ Fijado por los documentos:
 
 ## 6. Comandos
 
-Copiados de [docs/testing-strategy.md §2](docs/testing-strategy.md#2-los-cuatro-niveles-de-validación), [docs/quality-baseline.md](docs/quality-baseline.md) y [docs/plan/tasks.md](docs/plan/tasks.md). Si discrepan, manda el plan; las discrepancias conocidas están en [docs/plan/README.md](docs/plan/README.md#34-hallazgos) (F-11 a F-13).
+Copiados de [docs/testing-strategy.md §2](docs/testing-strategy.md#2-los-cuatro-niveles-de-validación), [docs/quality-baseline.md](docs/quality-baseline.md) y [docs/plan/tasks.md](docs/plan/tasks.md). Si discrepan, manda el plan; las discrepancias conocidas están en [docs/plan/README.md](docs/plan/README.md#34-hallazgos) (F-11 y F-13; F-12 lo resuelve T-006 registrando el marcador `integration` de pytest).
 
 ### Niveles de validación
 
@@ -135,10 +144,11 @@ Las líneas de Python existen desde T-006; `tools/archcheck` y `tools/depbudget`
 |---|---|---|
 | Cobertura | `go test -tags=integration -coverprofile=coverage.out ./... && go run ./tools/covergate -profile coverage.out` | T-031 |
 | Trazabilidad de requisitos | `go run ./tools/fr-trace -from 1 -to 23` | T-031 |
+| Gancho de pre-commit | `.githooks/pre-commit` (se activa con `git config core.hooksPath .githooks`) | T-003; líneas de Python, T-006 |
 | Python completo | `uv run --project eval ruff check eval && uv run --project eval ruff format --check eval && uv run --project eval pytest eval/tests` | T-006 |
 | Vulnerabilidades | `go tool govulncheck ./... && uv run --project eval pip-audit` | T-001 / T-006 |
 | Arranque con un comando | `docker compose up -d --wait && curl -fsS http://127.0.0.1:8080/readyz` | T-003 |
-| Aislamiento | `go test -tags=integration ./internal/store -run 'TestIsolation_\|TestRLS_\|TestAppRole_' -count=1` | T-012 |
+| Aislamiento (incluye las funciones `SECURITY DEFINER` aprobadas) | `go test -tags=integration ./internal/store -run 'TestIsolation_\|TestRLS_\|TestAppRole_' -count=1` | T-012 |
 | Purga | `go test ./internal/store -tags=integration -run TestPurge_NoRowsLeftAnyTable` | T-028 |
 | Latencia de `recall` | `go test -tags=perf ./test/perf -run TestRecall_P95 -timeout 10m` | T-032 |
 
@@ -154,10 +164,12 @@ mnemo tenant create <nombre>
 mnemo key create --tenant <id> --scopes <lista> [--subject <id>]
 ```
 
+`migrate`, `tenant create` y `key create` necesitan `MNEMO_ADMIN_DATABASE_URL`. Con Compose se ejecutan en un contenedor efímero del servicio `admin`, no en el servicio `mnemo`: `docker compose run --rm -T admin tenant create <nombre>`.
+
 Reproducción del benchmark ([docs/evaluation-plan.md §11](docs/evaluation-plan.md#11-reproducción)):
 
 ```
-docker compose up -d
+docker compose up -d --wait
 uv run --project eval mnemo-eval fetch
 uv run --project eval mnemo-eval run --protocol eval/config/protocol.yaml --arms all
 uv run --project eval mnemo-eval report --out eval/results/

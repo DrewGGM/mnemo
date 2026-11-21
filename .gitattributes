@@ -1,0 +1,4 @@
+# LF in every working copy, whatever core.autocrlf says: gofmt reports CRLF
+# Go files as unformatted, and a CRLF shebang breaks the pre-commit hook.
+*.go          text eol=lf
+.githooks/*   text eol=lf

@@ -1,0 +1,16 @@
+#!/bin/sh
+# Go checks marked as pre-commit in docs/quality-baseline.md §2 (ADR-0007,
+# decision 9). Enable once per clone: git config core.hooksPath .githooks
+set -eu
+cd "$(git rev-parse --show-toplevel)"
+
+unformatted="$(gofmt -l .)"
+if [ -n "$unformatted" ]; then
+	echo "pre-commit: gofmt would change:" >&2
+	echo "$unformatted" >&2
+	exit 1
+fi
+
+go vet ./...
+go tool staticcheck ./...
+go test ./...

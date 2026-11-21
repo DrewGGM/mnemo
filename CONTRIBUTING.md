@@ -2,7 +2,7 @@
 
 Convenciones, comandos y Definición de hecho. Escrito en español, como los documentos que resume. Se lee antes de cada tarea ([docs/plan/tasks.md](docs/plan/tasks.md#cómo-se-ejecuta-este-archivo)) y se actualiza cuando cambia un comando o una convención ([docs/quality-baseline.md §8](docs/quality-baseline.md#8-documentación-obligatoria)).
 
-Estado: fase de diseño, sin código. Los comandos que dependen de un programa o archivo que aún no existe indican la tarea que lo crea.
+Los comandos que dependen de un programa o archivo que aún no existe indican la tarea que lo crea.
 
 ## 1. Idioma
 
@@ -17,10 +17,10 @@ Estado: fase de diseño, sin código. Los comandos que dependen de un programa o
 ## 2. Entorno
 
 - Shell POSIX (en Windows, Git Bash), desde la raíz del repositorio.
-- Go ≥ 1.24 (directiva `tool` en `go.mod`), Docker con Compose, `uv`.
+- Go ≥ 1.26 (`go.mod` fija `toolchain go1.26.11`), Docker con Compose, `uv`.
 - Secretos solo por variables de entorno; `.env` está ignorado por git. `.env.example` llega con T-036.
 - El servicio `db` de Compose publica PostgreSQL en `127.0.0.1:55432` (variable `MNEMO_DB_PORT`), no en 5432, para no chocar con un PostgreSQL local. Las URL de prueba apuntan ahí: `postgres://mnemo_app:<contraseña>@127.0.0.1:55432/mnemo?sslmode=disable` y lo mismo con `mnemo_admin`; las contraseñas de desarrollo están en `docker-compose.yml` (T-002).
-- Gancho de pre-commit versionado (desde T-003): `git config core.hooksPath .githooks` una vez por clon.
+- Gancho de pre-commit versionado (desde T-003): se activa con `git config core.hooksPath .githooks`, una vez por clon. Ejecuta formato, `go vet`, `staticcheck` y `go test ./...`, y el commit no se crea si alguno falla. `.gitattributes` mantiene en LF los `.go` y el gancho aunque `core.autocrlf` sea `true`.
 
 Variables:
 

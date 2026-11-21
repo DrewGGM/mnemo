@@ -26,5 +26,38 @@ services:
       timeout: 3s
       retries: 30
 
+  # One-shot service: the only one that receives the mnemo_admin credential.
+  # Admin subcommands run in a throwaway container of it:
+  #   docker compose run --rm -T admin tenant create <name>
+  admin:
+    build: .
+    image: mnemo:dev
+    command: ["migrate"]
+    environment:
+      MNEMO_ADMIN_DATABASE_URL: postgres://mnemo_admin:mnemo_admin_dev@db:5432/mnemo?sslmode=disable
+    depends_on:
+      db:
+        condition: service_healthy
+    # The image probes /readyz, which a migration run never serves.
+    healthcheck:
+      disable: true
+
+  # The service connects as mnemo_app only (ADR-0007, decision 2); CI fails if
+  # its environment mentions mnemo_admin.
+  mnemo:
+    build: .
+    image: mnemo:dev
+    command: ["serve"]
+    environment:
+      MNEMO_DATABASE_URL: postgres://mnemo_app:mnemo_app_dev@db:5432/mnemo?sslmode=disable
+      MNEMO_EMBED_DIM: "1024"
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+      admin:
+        condition: service_completed_successfully
+
 volumes:
   pgdata:

@@ -30,7 +30,7 @@ Las listas "Tocar solo", dependencias y criterios de este archivo ya incorporan 
 ### M0 — Esqueleto andante
 - [x] T-001 Módulo Go, binario `mnemo serve` y `/healthz`
 - [x] T-002 PostgreSQL en Docker, migraciones y `/readyz`
-- [ ] T-003 Imagen, CI y comprobadores de arquitectura y dependencias
+- [x] T-003 Imagen, CI y comprobadores de arquitectura y dependencias
 - [ ] T-004 Guardar y recuperar episodios de punta a punta (solo vector)
 - [ ] T-005 Servidor MCP por stdio con `recall`
 - [ ] T-006 Harness de evaluación mínimo con modelos falsos
@@ -142,7 +142,7 @@ Las listas "Tocar solo", dependencias y criterios de este archivo ya incorporan 
 - **Implementa:** FR-25 · **Decisión:** AD-1, SM-C5, docs/security-baseline.md §8, ADR-0007
 - **Depende de:** T-002
 - **Leer antes:** docs/quality-baseline.md#7-integración-continua · docs/security-baseline.md#8-cadena-de-suministro
-- **Tocar solo:** Dockerfile, docker-compose.yml, .github/workflows/ci.yml, tools/depbudget/main.go, tools/archcheck/main.go, .githooks/pre-commit, CONTRIBUTING.md
+- **Tocar solo:** Dockerfile, docker-compose.yml, .github/workflows/ci.yml, tools/depbudget/main.go, tools/archcheck/main.go, .githooks/pre-commit, CONTRIBUTING.md, .gitattributes (open-questions §3, fila T-003 de `.gitattributes`)
 - **No tocar:** internal/**, cmd/**
 - **Interfaces:**
   - *Produce:* `go run ./tools/depbudget -max N` (falla si `go.mod` tiene más de N dependencias directas, sin contar las de la directiva `tool`); `go run ./tools/archcheck` (falla si `internal/resolve`, `internal/retrieve` o `internal/policy` importan `internal/store`, `internal/provider`, `net/http` o `database/sql`, o si `internal/httpapi` o `internal/mcpserver` importan otro paquete `internal/` que no sea `internal/config`; en sus archivos de prueba admite además `internal/store/storetest`, ADR-0007, decisión 3).

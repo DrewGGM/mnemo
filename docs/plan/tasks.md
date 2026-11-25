@@ -38,7 +38,7 @@ Las listas "Tocar solo", dependencias y criterios de este archivo ya incorporan 
 *Punto de control: una petición real atraviesa API → dominio → PostgreSQL → respuesta, por REST y por MCP; el CI la ejecuta; el harness produce una tabla.*
 
 ### M1 — Mayor riesgo: ¿la extracción aporta?
-- [ ] T-007 Adaptadores de chat y embeddings compatibles con OpenAI
+- [x] T-007 Adaptadores de chat y embeddings compatibles con OpenAI · parcial (open-questions §3)
 - [ ] T-008 Descarga y carga de LongMemEval_S y subconjunto de desarrollo
 - [ ] T-009 Líneas base B0, B1, B2, lector, juez e informe
 - [ ] T-010 Extracción de hechos (solo añadir) y recuperación de hechos
@@ -221,7 +221,7 @@ Las listas "Tocar solo", dependencias y criterios de este archivo ya incorporan 
 - **Implementa:** FR-23 (parte) · **Decisión:** ADR-0006, ADR-0007 (decisión 14)
 - **Depende de:** T-004
 - **Leer antes:** docs/adr/ADR-0006-puertos-de-modelos-y-dimension.md · docs/quality-baseline.md#4-estabilidad
-- **Tocar solo:** internal/provider/chat.go, internal/provider/embed.go, internal/provider/retry.go, internal/provider/provider_test.go, providers.go, cmd/mnemo/main.go (open-questions §3, fila T-007 de `newEmbedder`)
+- **Tocar solo:** internal/provider/chat.go, internal/provider/embed.go, internal/provider/retry.go, internal/provider/provider_test.go, providers.go, cmd/mnemo/main.go (open-questions §3, fila T-007 de `newEmbedder`), internal/provider/live_test.go (open-questions §3, fila T-007 de la prueba `live`)
 - **No tocar:** internal/store/**, go.mod
 - **Interfaces:**
   - *Produce:* `mnemo.ChatModel { Complete(ctx, mnemo.ChatRequest) (mnemo.ChatResponse, error) }` con `ChatRequest{System, User string; JSONSchema []byte; MaxTokens int}` y `ChatResponse{Text string; Usage mnemo.Usage}`; `mnemo.Usage{InputTokens, OutputTokens int; Provider, Model string}`; `mnemo.OpenAICompatibleChat(baseURL, apiKey, model string) mnemo.ChatModel`; `mnemo.OpenAICompatibleEmbedder(baseURL, apiKey, model string, dim int) mnemo.Embedder`.
@@ -493,7 +493,7 @@ Las listas "Tocar solo", dependencias y criterios de este archivo ya incorporan 
 - **Implementa:** FR-9 · **Decisión:** ADR-0001 (texto completo nativo), característica rectora, ADR-0007
 - **Depende de:** T-010
 - **Leer antes:** docs/architecture.md#9-algoritmos-que-fijan-el-comportamiento · docs/quality-baseline.md#1-funciones-de-aptitud
-- **Tocar solo:** internal/retrieve/fuse.go, internal/retrieve/fuse_test.go, internal/store/search.go, internal/store/search_test.go, mnemo.go, options.go
+- **Tocar solo:** internal/retrieve/fuse.go, internal/retrieve/fuse_test.go, internal/store/search.go, internal/store/search_test.go, mnemo.go, options.go, internal/provider/embed.go, internal/provider/provider_test.go, cmd/mnemo/main.go (open-questions §3, fila T-021 de los reintentos en lectura)
 - **No tocar:** internal/httpapi/** (el parámetro `sources` ya pasa tal cual)
 - **Interfaces:**
   - *Produce:* `retrieve.FuseRRF(lists [][]retrieve.ID, k int) []retrieve.Scored`; `store.SearchEpisodesFTS`, `store.SearchFactsFTS`, `store.SearchEpisodesByVector`, `store.SearchFactsByVector`, todas con límite 40 y filtradas por `(tenant_id, subject_id)`; tipo `mnemo.Source` con constantes `SourceFactsVector`, `SourceFactsFTS`, `SourceFactsGraph`, `SourceEpisodesVector`, `SourceEpisodesFTS`; opción `mnemo.Sources(...mnemo.Source)`.

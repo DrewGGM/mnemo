@@ -20,6 +20,7 @@ import (
 	"github.com/DrewGGM/mnemo/internal/config"
 	"github.com/DrewGGM/mnemo/internal/httpapi"
 	"github.com/DrewGGM/mnemo/internal/mcpserver"
+	"github.com/DrewGGM/mnemo/internal/provider"
 	"github.com/DrewGGM/mnemo/internal/store"
 )
 
@@ -152,15 +153,19 @@ func runMCP(ctx context.Context, getenv func(string) string, logger *slog.Logger
 	return err
 }
 
-// newEmbedder returns the deterministic fake embedder while this build has no
-// adapter for a real one, and refuses to start if a real one is configured,
-// so a deployment never believes it embeds with a model it is not using.
+// newEmbedder returns the OpenAI-compatible embedder that MNEMO_EMBED_* name,
+// or the deterministic fake one when MNEMO_EMBED_BASE_URL is not set.
 func newEmbedder(cfg config.Config, logger *slog.Logger) (mnemo.Embedder, error) {
-	if cfg.EmbedBaseURL != "" {
-		return nil, errors.New("MNEMO_EMBED_BASE_URL is set, but this build has no embedding adapter; unset it to use the fake embedder")
+	if cfg.EmbedBaseURL == "" {
+		logger.Warn("MNEMO_EMBED_BASE_URL is not set: embedding with the deterministic fake embedder, which is meant for tests only")
+		return mnemo.FakeEmbedder(cfg.EmbedDim), nil
 	}
-	logger.Warn("MNEMO_EMBED_BASE_URL is not set: embedding with the deterministic fake embedder, which is meant for tests only")
-	return mnemo.FakeEmbedder(cfg.EmbedDim), nil
+	// mnemo.OpenAICompatibleEmbedder reports an invalid configuration only
+	// when it is first called; checking it here stops the process at start.
+	if _, err := provider.NewEmbedder(cfg.EmbedBaseURL, cfg.EmbedAPIKey, cfg.EmbedModel, cfg.EmbedDim); err != nil {
+		return nil, fmt.Errorf("MNEMO_EMBED_*: %w", err)
+	}
+	return mnemo.OpenAICompatibleEmbedder(cfg.EmbedBaseURL, cfg.EmbedAPIKey, cfg.EmbedModel, cfg.EmbedDim), nil
 }
 
 func serve(ctx context.Context, cfg config.Config, deps httpapi.Deps, logger *slog.Logger) error {

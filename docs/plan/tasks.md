@@ -39,7 +39,7 @@ Las listas "Tocar solo", dependencias y criterios de este archivo ya incorporan 
 
 ### M1 — Mayor riesgo: ¿la extracción aporta?
 - [x] T-007 Adaptadores de chat y embeddings compatibles con OpenAI · parcial (open-questions §3)
-- [ ] T-008 Descarga y carga de LongMemEval_S y subconjunto de desarrollo
+- [x] T-008 Descarga y carga de LongMemEval_S y subconjunto de desarrollo
 - [ ] T-009 Líneas base B0, B1, B2, lector, juez e informe
 - [ ] T-010 Extracción de hechos (solo añadir) y recuperación de hechos
 - [ ] T-011 Experimento M1 sobre 60 preguntas y decisión
@@ -241,7 +241,7 @@ Las listas "Tocar solo", dependencias y criterios de este archivo ya incorporan 
 - **Tocar solo:** eval/src/mnemo_eval/datasets/longmemeval.py, eval/src/mnemo_eval/cli.py, eval/config/protocol.yaml, eval/tests/test_longmemeval.py
 - **No tocar:** eval/src/mnemo_eval/pipeline.py
 - **Interfaces:**
-  - *Produce:* comando `mnemo-eval fetch`; `load_longmemeval(path) -> list[Question]` con `Question(id, type, question, answer, question_date, sessions: list[Session], evidence_session_ids, is_abstention)`; `split(questions, name) -> list[Question]` para `dev60`, `heldout440`, `write100` y `all`.
+  - *Produce:* comando `mnemo-eval fetch`; `load_longmemeval(path) -> list[Question]` con `Question(id, type, question, answer, question_date, sessions: list[Session], evidence_session_ids, is_abstention)`; `split(questions, name, seed) -> list[Question]` para `dev60`, `heldout440`, `write100` y `all`, con la semilla del protocolo (open-questions §3, fila T-009 de T-008).
 - **Hecho cuando:**
   - [ ] `fetch` descarga `longmemeval_s_cleaned.json` y `longmemeval_oracle.json` a `eval/data/`, calcula su SHA-256 y falla si no coincide con el de `protocol.yaml` (la primera vez lo imprime para fijarlo).
   - [ ] El cargador produce 500 preguntas, de las cuales 30 de abstención, e imprime el recuento por tipo.

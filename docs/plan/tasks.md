@@ -40,7 +40,7 @@ Las listas "Tocar solo", dependencias y criterios de este archivo ya incorporan 
 ### M1 — Mayor riesgo: ¿la extracción aporta?
 - [x] T-007 Adaptadores de chat y embeddings compatibles con OpenAI · parcial (open-questions §3)
 - [x] T-008 Descarga y carga de LongMemEval_S y subconjunto de desarrollo
-- [ ] T-009 Líneas base B0, B1, B2, lector, juez e informe
+- [x] T-009 Líneas base B0, B1, B2, lector, juez e informe · parcial (open-questions §3)
 - [ ] T-010 Extracción de hechos (solo añadir) y recuperación de hechos
 - [ ] T-011 Experimento M1 sobre 60 preguntas y decisión
 
@@ -255,11 +255,11 @@ Las listas "Tocar solo", dependencias y criterios de este archivo ya incorporan 
 - **Implementa:** FR-24 · **Decisión:** ADR-0004, ADR-0007 (decisión 14)
 - **Depende de:** T-007, T-008
 - **Leer antes:** docs/evaluation-plan.md#3-brazos · docs/evaluation-plan.md#5-métricas
-- **Tocar solo:** eval/src/mnemo_eval/arms.py, eval/src/mnemo_eval/models.py, eval/src/mnemo_eval/judge.py, eval/src/mnemo_eval/metrics.py, eval/src/mnemo_eval/report.py, eval/src/mnemo_eval/prompts/reader.txt, eval/tests/test_metrics.py, eval/config/protocol.yaml, eval/src/mnemo_eval/pipeline.py, eval/src/mnemo_eval/cli.py (open-questions §3, fila T-009 de lo que deja T-006)
+- **Tocar solo:** eval/src/mnemo_eval/arms.py, eval/src/mnemo_eval/models.py, eval/src/mnemo_eval/judge.py, eval/src/mnemo_eval/metrics.py, eval/src/mnemo_eval/report.py, eval/src/mnemo_eval/prompts/reader.txt, eval/tests/test_metrics.py, eval/config/protocol.yaml, eval/src/mnemo_eval/pipeline.py, eval/src/mnemo_eval/cli.py (open-questions §3, fila T-009 de lo que deja T-006), eval/tests/test_pipeline.py, eval/tests/test_models.py (open-questions §3, fila T-009 de los archivos de prueba)
 - **No tocar:** internal/**, eval/src/mnemo_eval/datasets/**
 - **Interfaces:**
   - *Consume:* `MnemoClient`, `Question`, `split`.
-  - *Produce:* brazos `B0`, `B1`, `B2`, `M` como funciones `arm(question, cfg) -> ArmOutput(context, context_tokens, recall_ms, retrieved_session_ids)`; `judge(question, answer) -> bool` con los prompts por tipo del script oficial; `metrics.accuracy`, `metrics.recall_at_k`, `metrics.mrr`, `metrics.percentile`, `metrics.bootstrap_ci`; comando `mnemo-eval report --out <dir>` que escribe `summary.json` y la tabla en Markdown; comando `mnemo-eval verify-protocol <dir>`.
+  - *Produce:* brazos `B0`, `B1`, `B2`, `M` como funciones `arm(question, cfg, client, subject) -> ArmOutput(context, context_tokens, recall_ms, retrieved_session_ids)`; `judge(question, answer, model) -> bool` con los prompts por tipo del script oficial; `metrics.accuracy`, `metrics.recall_at_k`, `metrics.mrr`, `metrics.percentile`, `metrics.bootstrap_ci`; comando `mnemo-eval report --out <dir>` que escribe `summary.json` y la tabla en Markdown; comando `mnemo-eval verify-protocol <dir>`.
 - **Hecho cuando:**
   - [ ] B0 envía solo la pregunta y su fecha; B1 todo el historial en orden cronológico; B2 ingiere en mnemo y consulta con `sources=["episodes.vector"]` hasta el presupuesto de 8.000 tokens.
   - [ ] Todos los brazos usan el mismo archivo `reader.txt`, temperatura 0, y registran las tokens de entrada que devuelve el proveedor.

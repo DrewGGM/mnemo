@@ -1,20 +1,21 @@
 """Command line of the evaluation harness: mnemo-eval."""
 
 import argparse
-import json
 import sys
 from pathlib import Path
 
 import yaml
 
-from mnemo_eval import pipeline
+from mnemo_eval import pipeline, report
 from mnemo_eval.client import MnemoClient, MnemoError
 from mnemo_eval.datasets import longmemeval
+from mnemo_eval.models import ModelError
 
 # The mnemo service of docker-compose.yml.
 BASE_URL = "http://127.0.0.1:8080"
 # Commands run from the repository root (CONTRIBUTING.md).
 DEFAULT_PROTOCOL = Path("eval/config/protocol.yaml")
+ERRORS = (MnemoError, ModelError, ValueError, KeyError, OSError, yaml.YAMLError)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -26,30 +27,65 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--split", help="only the questions of this split of the protocol")
     fetch = commands.add_parser("fetch", help="download the datasets and check their SHA-256")
     fetch.add_argument("--protocol", default=DEFAULT_PROTOCOL, type=Path, help="protocol YAML file")
+    rep = commands.add_parser("report", help="write summary.json and the results table")
+    rep.add_argument("--out", required=True, type=Path, help="directory of the report")
+    rep.add_argument("--protocol", default=DEFAULT_PROTOCOL, type=Path, help="protocol YAML file")
+    verify = commands.add_parser(
+        "verify-protocol", help="fail if a results directory mixes protocol ids"
+    )
+    verify.add_argument("dir", type=Path, help="directory of runs or results")
     args = parser.parse_args(argv)
     try:
-        if args.command == "fetch":
-            return _fetch(args.protocol)
-        return _run(args.protocol, args.arms.split(","), args.split)
-    except (MnemoError, ValueError, KeyError, OSError, yaml.YAMLError) as err:
+        return _dispatch(args)
+    except ERRORS as err:
         print(f"mnemo-eval: {type(err).__name__}: {err}", file=sys.stderr)
         return 1
+
+
+def _dispatch(args: argparse.Namespace) -> int:
+    if args.command == "fetch":
+        return _fetch(args.protocol)
+    if args.command == "report":
+        return _report(args.protocol, args.out)
+    if args.command == "verify-protocol":
+        return _verify(args.dir)
+    return _run(args.protocol, args.arms.split(","), args.split)
 
 
 def _run(protocol: Path, arm_names: list[str], split: str | None) -> int:
     spec = pipeline.load_protocol(protocol)
     arms = pipeline.select_arms(spec, arm_names)
     questions = pipeline.load_questions(spec, split)
-    # Protocols live in eval/config; runs go to eval/runs.
-    runs_dir = protocol.resolve().parent.parent / "runs"
-    paths = pipeline.run(spec, arms, questions, MnemoClient(BASE_URL), runs_dir)
+    backends = pipeline.open_backends(spec, MnemoClient(BASE_URL))
+    paths = pipeline.run(spec, arms, questions, backends, _runs_dir(protocol))
     print(f"protocol {spec.id}")
     print(f"{'arm':<6} {'correct':>9}  results")
     for name, path in paths.items():
-        rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+        rows = pipeline.read_rows(path)
         correct = sum(r["correct"] for r in rows)
         print(f"{name:<6} {correct:>4}/{len(rows):<4}  {path}")
     return 0
+
+
+def _runs_dir(protocol: Path) -> Path:
+    # Protocols live in eval/config; runs go to eval/runs.
+    return protocol.resolve().parent.parent / "runs"
+
+
+def _report(protocol: Path, out: Path) -> int:
+    spec = pipeline.load_protocol(protocol)
+    summary = report.summarize(spec, report.load_runs(spec, _runs_dir(protocol)))
+    for path in report.write(summary, out):
+        print(path)
+    return 0
+
+
+def _verify(directory: Path) -> int:
+    checked, problems = report.verify_protocol(directory)
+    for problem in problems:
+        print(f"mnemo-eval: {problem}", file=sys.stderr)
+    print(f"{checked} result directories under {directory}, {len(problems)} problems")
+    return 1 if problems else 0
 
 
 def _fetch(protocol: Path) -> int:
